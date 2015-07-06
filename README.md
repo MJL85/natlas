@@ -23,7 +23,7 @@ My bitcoin address is: **`14J9R95Sru4d489W1B4Mk3hh1bWpBV9Rpb`**
 
 MNet-Graph crawls a network and builds a detailed DOT diagram (.png output).
 
-`# mnet-graph.py -r <root IP> [-d <depth>] [-f <file>] [-t <diagram title>]`
+`# mnet-graph.py -r <root IP> <-f <file>> [-d <depth>] [-c <config file>] [-t <diagram title>]`
 
 ### Requirements
 
@@ -31,6 +31,33 @@ MNet-Graph requires the following:
 + Python 2.x
 + PySNMP
 + PyDot
+
+### Configuration File
+
+The toolset uses a JSON configuration file for common parameters.
+
+```
+{  
+	"snmp" : [
+		{ "community":"superpublic",	"ver":2 },
+		{ "community":"public",		"ver":2 } 
+	],
+	"domains" : [
+		".company.net",
+		".company.com"
+	],
+	"ignore" : [
+		"0.0.0.0"
+	]
+}
+```
+
+The *snmp* block defines a list of SNMP credentials.  When connecting to a node, each of these credentials is tried in order until one is successful.  This allows crawling a large network with devices that potentially use different SNMP credentials.  
+[mnet-graph only] The *domains* block defines a list of domains that should be stripped off of the device names.  For example, if is switch is found with the name *SW1.company.com*, the above example will only show *SW1* in the output.  
+  
+[mnet-graph only] The *ignore* block defines a list of nodes that should be skipped entirely during the discovery process. Since the node is skipped nothing beyond it will be discovered.
+
+
 
 ### Details
 
