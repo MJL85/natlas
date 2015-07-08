@@ -2,7 +2,7 @@
 
 '''
 	MNet-Graph.py
-	v0.1
+	v0.2
 
 	Michael Laforest
 	mjlaforest@gmail.com
@@ -31,6 +31,12 @@
 	root device using SNMP.
 
 	Neighbors are discovered through CDP.
+
+	Dependencies:
+		- GraphViz
+		- PyDot
+		- PySNMP
+		- PyNetAddr
 '''
 
 import sys
@@ -39,15 +45,20 @@ import pydot
 import datetime
 import json
 import os
+import socket
+import struct
+import re
 from pysnmp.entity.rfc3413.oneliner import cmdgen
+from netaddr import IPAddress, IPNetwork
 
-MNET_GRAPH_VERSION	= 'v0.1'
+MNET_GRAPH_VERSION	= 'v0.2'
 
 SNMP_PORT = 161
 
 OID_PLATFORM1	= '1.3.6.1.2.1.47.1.1.1.1.2.1001'
 OID_PLATFORM2	= '1.3.6.1.4.1.9.9.92.1.1.1.13.1'		# AIR-CAP1702
 OID_PLATFORM3	= '1.3.6.1.4.1.9.9.249.1.1.1.1.3.1000'	# C4500
+OID_PLATFORM4	= '1.3.6.1.2.1.47.1.1.1.1.2'			# Nexus
 
 OID_SYSNAME		= '1.3.6.1.2.1.1.5.0'
 
@@ -90,8 +101,9 @@ max_depth = 0
 
 # pulled from config file
 host_domains = []
-ignore_nodes = []
 snmp_creds = []
+exclude_subnets = []
+allowed_subnets = []
 
 #
 # Get single SMTP value at OID.
@@ -171,7 +183,8 @@ def get_sys_platform(ip):
 	oids = [
 			OID_PLATFORM1,
 			OID_PLATFORM2,
-			OID_PLATFORM3
+			OID_PLATFORM3,
+			OID_PLATFORM4
 	]
 
 	for oid in oids:
@@ -212,6 +225,11 @@ def get_ip_from_ifidx(ip, ifidx):
 
 			netm = get_snmp_val(ip, OID_IF_IP_NETM + ip)
 			cidr = 0
+
+			# layer 3 unnumbered interface
+			if (netm == None):
+				return 'Unnumbered'
+
 			mt = netm.split('.')
 			for b in range(0, 4):
 				v = int(mt[b])
@@ -248,10 +266,8 @@ def get_stackwise_count(ip):
 # Recurse down a level if 'depth' > 0
 #
 def crawl_node(ip, depth):
-	# check if this node should be ignored
-	for ignore in ignore_nodes:
-		if (ignore == ip):
-			return
+	if (is_node_allowed(ip) == 0):
+		return
 
 	system_name = shorten_host_name(get_snmp_val(ip, OID_SYSNAME) or 'UNKNOWN')
 
@@ -325,8 +341,12 @@ def crawl_node(ip, depth):
 
 			# get remote IP
 			rip = get_snmp_val(ip, OID_CDP_IPADDR + '.' + ifidx + '.' + t[15])
-			rip = convert_ip_int_str(rip)		
-						
+			rip = convert_ip_int_str(rip)
+
+			# if the remote IP is not allowed, stop processing it here
+			if (is_node_allowed(rip) == 0):
+				continue
+
 			# get local port
 			#lport = get_snmp_val(ip, OID_CDP_INT + '6.' + ifidx)
 			#lport = shorten_port_name(lport)
@@ -371,6 +391,31 @@ def crawl_node(ip, depth):
 		crawl_node(child, depth-1)
 
 
+#
+# Returns 1 if the IP is allowed to be crawled.
+#
+def is_node_allowed(ip):
+	global allowed_subnets
+	global exclude_subnets
+
+	ipaddr = IPAddress(ip)
+
+	# check exclude nodes
+	for e in exclude_subnets:
+		if (ip in IPNetwork(e)):
+			return 0
+	
+	# check allowed subnets
+	if ((allowed_subnets == None) | (len(allowed_subnets) == 0)):
+		return 1
+
+	for s in allowed_subnets:
+		if (ipaddr in IPNetwork(s)):
+			return 1
+
+	return 0
+
+
 def shorten_port_name(port):
 	if (port == OID_ERR):
 		return 'UNKNOWN'
@@ -387,6 +432,8 @@ def shorten_port_name(port):
 
 
 def shorten_host_name(host):
+	# Nexus appends (SERIAL) to hosts
+	host = re.sub('\([^\(]*\)$', '', host)
 	for domain in host_domains:
 		host = host.replace(domain, '')
 
@@ -428,12 +475,12 @@ def add_l2_link(node):
 	l2links.append(node)
 
 
-
 def main(argv):
 	global max_depth
 	global snmp_creds
 	global host_domains
-	global ignore_nodes
+	global exclude_subnets
+	global allowed_subnets
 
 	print('MNet-Graph %s' % MNET_GRAPH_VERSION)
 	print('Written by Michael Laforest <mjlaforest@gmail.com>')
@@ -482,7 +529,8 @@ def main(argv):
 
 	host_domains	= json_data['domains']
 	snmp_creds		= json_data['snmp']
-	ignore_nodes	= json_data['ignore']
+	exclude_subnets	= json_data['exclude']
+	allowed_subnets	= json_data['subnets']
 
 	crawl_node(opt_root_ip, opt_depth)
 		
