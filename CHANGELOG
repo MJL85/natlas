@@ -4,16 +4,16 @@ MNet-Graph
 
 ----------
 
+v0.3 - 7/8/2015
+	- Added -C option to write a catalog of the discovery to a csv file.
+	- Runs for ~1/4 the time.
+
 v0.2 - 7/7/2015
 
 	- Config: Changed "ignore" to "exclude". Now a list of CIDR's instead of specific IP addresses (requested by /u/LiftedKilt)
-
 	- Config: Added "subnets" block.  List of CIDR's of allowed subnets to be crawled. (requeted by /u/1n5aN1aC)
-
 	- Fixed bug related to unnumbered layer 3 interface (reported by /u/chazmosis)
-
 	- Fixed bug related to Nexus host format (reported by /u/endemic)
-
 	- Added OID for Nexus platform (thanks to /u/endemic)
 
 v0.1 - 7/6/2015
