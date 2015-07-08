@@ -31,6 +31,7 @@ MNet-Graph requires the following:
 + Python 2.x
 + PySNMP
 + PyDot
++ PyNetAddr
 
 ### Configuration File
 
@@ -38,25 +39,28 @@ The toolset uses a JSON configuration file for common parameters.
 
 ```
 {  
-	"snmp" : [
-		{ "community":"superpublic",	"ver":2 },
-		{ "community":"public",		"ver":2 } 
-	],
-	"domains" : [
-		".company.net",
-		".company.com"
-	],
-	"ignore" : [
-		"0.0.0.0"
-	]
-}
-```
+	"snmp" : [  
+		{ "community":"superpublic",	"ver":2 },  
+		{ "community":"public",		"ver":2 }  
+	],  
+	"domains" : [  
+		".company.net",  
+		".company.com"  
+	],  
+	"exclude" : [  
+		"192.168.0.0/16"  
+	],  
+	"subnets" : [  
+		"10.0.0.0/8"  
+	]  
+}```
 
-The *snmp* block defines a list of SNMP credentials.  When connecting to a node, each of these credentials is tried in order until one is successful.  This allows crawling a large network with devices that potentially use different SNMP credentials.  
-[mnet-graph only] The *domains* block defines a list of domains that should be stripped off of the device names.  For example, if is switch is found with the name *SW1.company.com*, the above example will only show *SW1* in the output.  
+The **snmp** block defines a list of SNMP credentials.  When connecting to a node, each of these credentials is tried in order until one is successful.  This allows crawling a large network with devices that potentially use different SNMP credentials.  
+[mnet-graph only] The **domains** block defines a list of domains that should be stripped off of the device names.  For example, if is switch is found with the name *SW1.company.com*, the above example will only show *SW1* in the output.  
   
-[mnet-graph only] The *ignore* block defines a list of nodes that should be skipped entirely during the discovery process. Since the node is skipped nothing beyond it will be discovered.
+[mnet-graph only] The **subnets** block defines a list of nodes that should be allowed to be discovered during the discovery process. If a node is discovered as being a neighbor to a node currently being crawled, the neighbor will only be crawled if it is in one of the CIDR ranges defined here. Therefore this list defines the subnets that are allowed to be included in the discovery process, but does not itself define the range of devices to be discovered.
 
+[mnet-graph only] The **exclude** block defines a list of nodes that should be skipped entirely during the discovery process. Since the node is skipped nothing beyond it will be discovered.
 
 
 ### Details
