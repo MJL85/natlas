@@ -28,10 +28,13 @@ MNet-Graph crawls a network and builds a detailed DOT diagram (.png output).
 ### Requirements
 
 MNet-Graph requires the following:
-+ Python 2.x
-+ PySNMP
-+ PyDot
-+ PyNetAddr
+
+|   | Tested With Version |
+| --- | --- |
+| **Python** | 2.7 |
+| **PySNMP** | 4.2.5 |
+| **PyDot** | 1.0.28 |
+| **PyNetAddr** | 0.7.14 |
 
 ### Configuration File
 
