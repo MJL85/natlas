@@ -2,7 +2,7 @@
 
 '''
 	MNet-Graph.py
-	v0.2
+	v0.3
 
 	Michael Laforest
 	mjlaforest@gmail.com
@@ -25,7 +25,9 @@
 
 
 
-	# mnet-graph.py -r <root IP> <-f <file>> [-d <depth>] [-c <config file>] [-t <diagram title>]
+	# mnet-graph.py -r <root IP> <-f <file>> [-d <depth>]
+					[-c <config file>] [-t <diagram title>]
+					[-C <catalog file>]
 
 	Collects information about a network starting at the specified
 	root device using SNMP.
@@ -45,13 +47,11 @@ import pydot
 import datetime
 import json
 import os
-import socket
-import struct
 import re
 from pysnmp.entity.rfc3413.oneliner import cmdgen
 from netaddr import IPAddress, IPNetwork
 
-MNET_GRAPH_VERSION	= 'v0.2'
+MNET_GRAPH_VERSION	= 'v0.3'
 
 SNMP_PORT = 161
 
@@ -62,20 +62,23 @@ OID_PLATFORM4	= '1.3.6.1.2.1.47.1.1.1.1.2'			# Nexus
 
 OID_SYSNAME		= '1.3.6.1.2.1.1.5.0'
 
+OID_SYS_SERIAL	= '1.3.6.1.4.1.9.3.6.3.0'
+OID_SYS_BOOT	= '1.3.6.1.4.1.9.2.1.73.0'
+
 OID_IFNAME		= '1.3.6.1.2.1.31.1.1.1.1.'				# + ifidx
 
-OID_CDP			= '1.3.6.1.4.1.9.9.23.1.2.1.1.'
+OID_CDP			= '1.3.6.1.4.1.9.9.23.1.2.1.1'
 OID_CDP_IPADDR	= '1.3.6.1.4.1.9.9.23.1.2.1.1.4'
 OID_CDP_DEVID	= '1.3.6.1.4.1.9.9.23.1.2.1.1.6'		# + .ifidx.53
 OID_CDP_DEVPORT	= '1.3.6.1.4.1.9.9.23.1.2.1.1.7'
 OID_CDP_DEVPLAT	= '1.3.6.1.4.1.9.9.23.1.2.1.1.8'
 OID_CDP_INT		= '1.3.6.1.4.1.9.9.23.1.1.1.1.'			# 6.ifidx
 
-OID_VTP_TRUNK	= '1.3.6.1.4.1.9.9.46.1.6.1.1.14.'		# + ifidx
-OID_LAG_LACP	= '1.2.840.10006.300.43.1.2.1.1.12.'	# + ifidx
+OID_VTP_TRUNK	= '1.3.6.1.4.1.9.9.46.1.6.1.1.14'		# + ifidx
+OID_LAG_LACP	= '1.2.840.10006.300.43.1.2.1.1.12'		# + ifidx
 
 OID_IP_ROUTING	= '1.3.6.1.2.1.4.1.0'
-OID_IF_VLAN		= '1.3.6.1.4.1.9.9.68.1.2.2.1.2.'		# + ifidx
+OID_IF_VLAN		= '1.3.6.1.4.1.9.9.68.1.2.2.1.2'		# + ifidx
 
 OID_IF_IP_ADDR	= '1.3.6.1.2.1.4.20.1.2'				# + a.b.c.d = ifidx
 OID_IF_IP_NETM	= '1.3.6.1.2.1.4.20.1.3.'				# + a.b.c.d
@@ -105,81 +108,86 @@ snmp_creds = []
 exclude_subnets = []
 allowed_subnets = []
 
-#
-# Get single SMTP value at OID.
-#
-def get_snmp_val(ip, oid):
+
+def get_snmp_cred(ip):
 	for cred in snmp_creds:
 		# we don't currently support anything other than SNMPv2
 		if (cred['ver'] != 2):
 			continue
-
 		community = cred['community']
-
 		cmdGen = cmdgen.CommandGenerator()
 		errIndication, errStatus, errIndex, varBinds = cmdGen.getCmd(
 				cmdgen.CommunityData(community),
 				cmdgen.UdpTransportTarget((ip, SNMP_PORT)),
-				oid,
-				lookupNames = False,
-				lookupValues = True
+				OID_SYSNAME, lookupNames = False, lookupValues = True
 		)
-
 		if errIndication:
-			print errIndication
-		else:
-			r = varBinds[0][1].prettyPrint()
-			if ((r == OID_ERR) | (r == OID_ERR_INST)):
-				return None
-			return r
-
-	return None
-
-
-#
-# Get next SMTP value at OID.
-#
-def get_snmp_next(ip, oid):
-	for cred in snmp_creds:
-		if (cred['ver'] != 2):
 			continue
-
-		community = cred['community']
-
-		cmdGen = cmdgen.CommandGenerator()
-		errIndication, errStatus, errIndex, varBindTable = cmdGen.nextCmd(
-				cmdgen.CommunityData(community),
-				cmdgen.UdpTransportTarget((ip, SNMP_PORT)),
-				oid,
-				lookupNames = False,
-				lookupValues = True
-		)
-
-		if errIndication:
-			print errIndication
 		else:
-			if errStatus:
-				print('[ERROR] %s: %s at %s' % (ip, errStatus.prettyPrint(), errIndex and varBindTable[-1][int(errIndex)-1] or '?'))
-				return None
-			return varBindTable
+			return cred
+	return None
+
+
+#
+# Get single SNMP value at OID.
+#
+def get_snmp_val(ip, cred, oid):
+	community = cred['community']
+
+	cmdGen = cmdgen.CommandGenerator()
+	errIndication, errStatus, errIndex, varBinds = cmdGen.getCmd(
+			cmdgen.CommunityData(community),
+			cmdgen.UdpTransportTarget((ip, SNMP_PORT), retries=2),
+			oid, lookupNames = False, lookupValues = True
+	)
+
+	if errIndication:
+		print errIndication
+	else:
+		r = varBinds[0][1].prettyPrint()
+		if ((r == OID_ERR) | (r == OID_ERR_INST)):
+			return None
+		return r
 
 	return None
 
 
-def get_node(host):
-	global nodes
+#
+# Get next SNMP value at OID.
+#
+def get_snmp_next(ip, cred, oid):
+	community = cred['community']
 
-	for n in nodes:
-		if (n['host'] == host):
-			return n
-	
+	cmdGen = cmdgen.CommandGenerator()
+	errIndication, errStatus, errIndex, varBindTable = cmdGen.nextCmd(
+			cmdgen.CommunityData(community),
+			cmdgen.UdpTransportTarget((ip, SNMP_PORT), retries=2),
+			oid, lookupNames = False, lookupValues = True
+	)
+
+	if errIndication:
+		print errIndication
+	else:
+		if errStatus:
+			print('[ERROR] %s: %s at %s' % (ip, errStatus.prettyPrint(), errIndex and varBindTable[-1][int(errIndex)-1] or '?'))
+			return None
+		return varBindTable
+
+	return None
+
+
+def get_val_vbtbl(varBindTable, name):
+	for varBindTableRow in varBindTable:
+		for n, v in varBindTableRow:
+			if (n.prettyPrint() == name):
+				return v.prettyPrint()
 	return None
 
 
 #
 # Get the platform type for this IP.
 #
-def get_sys_platform(ip):
+def get_sys_platform(ip, cred):
 	oids = [
 			OID_PLATFORM1,
 			OID_PLATFORM2,
@@ -188,7 +196,7 @@ def get_sys_platform(ip):
 	]
 
 	for oid in oids:
-		p = get_snmp_val(ip, oid)
+		p = get_snmp_val(ip, cred, oid)
 
 		if ((p != None) & (p != '') & (p != 'Port Container') & (p != OID_ERR)):
 			return p
@@ -196,22 +204,22 @@ def get_sys_platform(ip):
 	return 'UNKNOWN'
 
 
-def get_ifname(ip, ifidx):
+def get_ifname(ip, cred, ifidx):
 	if ((ifidx == None) | (ifidx == OID_ERR)):
 		return 'UNKNOWN'
 
-	str = get_snmp_val(ip, OID_IFNAME + ifidx)
+	str = get_snmp_val(ip, cred, OID_IFNAME + ifidx)
 	str = shorten_port_name(str)
 
 	return str or 'UNKNOWN'
 
 
-def get_ip_from_ifidx(ip, ifidx):
+def get_ip_from_ifidx(ip, cred, ifidx):
 	if ((ifidx == None) | (ifidx == OID_ERR)):
 		return 'UNKNOWN'
 
 	# get list of interface IP addresses
-	varBindTable = get_snmp_next(ip, OID_IF_IP_ADDR)
+	varBindTable = get_snmp_next(ip, cred, OID_IF_IP_ADDR)
 	if (varBindTable == None):
 		return 'UNKNOWN'
 
@@ -223,7 +231,7 @@ def get_ip_from_ifidx(ip, ifidx):
 			t = name.prettyPrint().split('.')
 			ip = '%s.%s.%s.%s' % (t[10], t[11], t[12], t[13])
 
-			netm = get_snmp_val(ip, OID_IF_IP_NETM + ip)
+			netm = get_snmp_val(ip, cred, OID_IF_IP_NETM + ip)
 			cidr = 0
 
 			# layer 3 unnumbered interface
@@ -243,8 +251,8 @@ def get_ip_from_ifidx(ip, ifidx):
 	return 'UNKNOWN'
 
 
-def get_stackwise_count(ip):
-	varBindTable = get_snmp_next(ip, OID_STACK_IMG)
+def get_stackwise_count(ip, cred):
+	varBindTable = get_snmp_next(ip, cred, OID_STACK_IMG)
 	if (varBindTable == None):
 		return 0
 
@@ -269,50 +277,55 @@ def crawl_node(ip, depth):
 	if (is_node_allowed(ip) == 0):
 		return
 
-	system_name = shorten_host_name(get_snmp_val(ip, OID_SYSNAME) or 'UNKNOWN')
+	# find valid credentials for this node
+	cred = get_snmp_cred(ip)
+	if (cred == None):
+		return
+
+	system_name = shorten_host_name(get_snmp_val(ip, cred, OID_SYSNAME) or 'UNKNOWN')
+
+	# prevent loops by checking if we've already done this node by host name
+	for ex in nodes:
+		if (ex['name'] == system_name):
+			return
 
 	# print some info to stdout
 	for i in range(0, max_depth-depth):
 		sys.stdout.write('.')
 	print('%s (%s)' % (system_name, ip))
 	
-	# prevent loops by checking if we've already done this node by host name
-	for ex in nodes:
-		if (ex['name'] == system_name):
-			return
-
 	# collect general information about this node
-	stack_count = get_stackwise_count(ip)
-	vss_enable = 1 if (get_snmp_val(ip, OID_VSS_MODE) == '2') else 0
+	stack_count = get_stackwise_count(ip, cred)
+	vss_enable = 1 if (get_snmp_val(ip, cred, OID_VSS_MODE) == '2') else 0
 	vss_domain = None
 
-	router = 1 if (get_snmp_val(ip, OID_IP_ROUTING) == '1') else 0
+	router = 1 if (get_snmp_val(ip, cred, OID_IP_ROUTING) == '1') else 0
 	ospf = None
 	bgp = None
 	hsrp_pri = None
 	hsrp_vip = None
 
 	if (vss_enable == 1):
-		vss_domain = get_snmp_val(ip, OID_VSS_DOMAIN)
+		vss_domain = get_snmp_val(ip, cred, OID_VSS_DOMAIN)
 
 	if (router == 1):
-		ospf = get_snmp_val(ip, OID_OSPF)
+		ospf = get_snmp_val(ip, cred, OID_OSPF)
 		if (ospf != None):
-			ospf = get_snmp_val(ip, OID_OSPF_ID)
+			ospf = get_snmp_val(ip, cred, OID_OSPF_ID)
 
-		bgp = get_snmp_val(ip, OID_BGP_LAS)
+		bgp = get_snmp_val(ip, cred, OID_BGP_LAS)
 		if (bgp == '0'):	# 4500x is reporting 0 with disabled
 			bgp = None
 
-		hsrp_pri = get_snmp_val(ip, OID_HSRP_PRI)
+		hsrp_pri = get_snmp_val(ip, cred, OID_HSRP_PRI)
 		if (hsrp_pri != None):
-			hsrp_vip = get_snmp_val(ip, OID_HSRP_VIP)
+			hsrp_vip = get_snmp_val(ip, cred, OID_HSRP_VIP)
 
 	# save this node
 	d = {}
 	d['name'] = system_name
 	d['ip']   = ip
-	d['plat'] = get_sys_platform(ip)
+	d['plat'] = get_sys_platform(ip, cred)
 	d['router'] = router
 	d['ospf_id'] = ospf or None
 	d['bgp_las'] = bgp or None
@@ -321,6 +334,7 @@ def crawl_node(ip, depth):
 	d['stack_count'] = stack_count
 	d['vss_enable'] = vss_enable
 	d['vss_domain'] = vss_domain
+	d['cred'] = cred
 	nodes.append(d)
 
 	if (depth <= 0):
@@ -329,18 +343,26 @@ def crawl_node(ip, depth):
 	children = []
 
 	# get list of CDP neighbors
-	varBindTable = get_snmp_next(ip, OID_CDP_DEVID)
-	if (varBindTable == None):
+	cdp_vbtbl = get_snmp_next(ip, cred, OID_CDP)
+	if (cdp_vbtbl == None):
 		return
 
-	for varBindTableRow in varBindTable:
+	# cache some common MIB trees
+	link_type_vbtbl	= get_snmp_next(ip, cred, OID_VTP_TRUNK)
+	lag_vbtbl		= get_snmp_next(ip, cred, OID_LAG_LACP)
+	vlan_vbtbl		= get_snmp_next(ip, cred, OID_IF_VLAN)
+
+	for varBindTableRow in cdp_vbtbl:
 		for name, val in varBindTableRow:
+			# process only if this row is a CDP_DEVID
+			if (name.prettyPrint().startswith(OID_CDP_DEVID) == 0):
+				continue
 
 			t = name.prettyPrint().split('.')
 			ifidx = t[14]
 
 			# get remote IP
-			rip = get_snmp_val(ip, OID_CDP_IPADDR + '.' + ifidx + '.' + t[15])
+			rip = get_val_vbtbl(cdp_vbtbl, OID_CDP_IPADDR + '.' + ifidx + '.' + t[15])
 			rip = convert_ip_int_str(rip)
 
 			# if the remote IP is not allowed, stop processing it here
@@ -348,26 +370,24 @@ def crawl_node(ip, depth):
 				continue
 
 			# get local port
-			#lport = get_snmp_val(ip, OID_CDP_INT + '6.' + ifidx)
-			#lport = shorten_port_name(lport)
-			lport = get_ifname(ip, ifidx)
+			lport = get_ifname(ip, cred, ifidx)
 
 			# get remote port
-			rport = get_snmp_val(ip, OID_CDP_DEVPORT + '.' + ifidx + '.' + t[15])
+			rport = get_val_vbtbl(cdp_vbtbl, OID_CDP_DEVPORT + '.' + ifidx + '.' + t[15])
 			rport = shorten_port_name(rport)
 
 			# get link type (trunk ?)
-			link_type = get_snmp_val(ip, OID_VTP_TRUNK + ifidx)
+			link_type = get_val_vbtbl(link_type_vbtbl, OID_VTP_TRUNK + '.' + ifidx)
 
 			# get LAG membership
-			lag = get_snmp_val(ip, OID_LAG_LACP + ifidx)
-			lag = get_ifname(ip, lag)
+			lag = get_val_vbtbl(lag_vbtbl, OID_LAG_LACP + '.' + ifidx)
+			lag = get_ifname(ip, cred, lag)
 
 			# get VLAN info
-			vlan = get_snmp_val(ip, OID_IF_VLAN + ifidx)
+			vlan = get_val_vbtbl(vlan_vbtbl, OID_IF_VLAN + '.' + ifidx)
 
 			# get IP address
-			lifip = get_ip_from_ifidx(ip, ifidx)
+			lifip = get_ip_from_ifidx(ip, cred, ifidx)
 
 			l2 = {}
 			l2['lip']		= ip
@@ -491,11 +511,12 @@ def main(argv):
 	opt_depth = 0
 	opt_title = 'MNet Network Diagram'
 	opt_conf = './mnet.conf'
+	opt_catalog = None
 
 	try:
-		opts, args = getopt.getopt(argv, 'f:d:r:t:F:c:')
+		opts, args = getopt.getopt(argv, 'f:d:r:t:F:c:C:')
 	except getopt.GetoptError:
-		print('usage: mnet-graph.py -r <root IP> <-f <file>> [-d <depth>] [-c <config file>] [-t <diagram title>]')
+		print('usage: mnet-graph.py -r <root IP> <-f <file>> [-d <depth>] [-c <config file>] [-t <diagram title>] [-C <catalog file>]')
 		sys.exit(1)
 	for opt, arg in opts:
 		if (opt == '-r'):
@@ -509,16 +530,19 @@ def main(argv):
 			opt_title = arg
 		if (opt == '-c'):
 			opt_conf = arg
+		if (opt == '-C'):
+			opt_catalog = arg
 
 	if ((opt_root_ip == None) | (opt_dot == None)):
 		print('Invalid arguments.')
 		return
 
-	print('    Config file: %s' % opt_conf)
-	print('      Root node: %s' % opt_root_ip)
-	print('    Output file: %s' % opt_dot)
-	print('    Crawl depth: %s' % opt_depth)
-	print('  Diagram title: %s' % opt_title)
+	print('     Config file: %s' % opt_conf)
+	print('       Root node: %s' % opt_root_ip)
+	print('     Output file: %s' % opt_dot)
+	print('     Crawl depth: %s' % opt_depth)
+	print('   Diagram title: %s' % opt_title)
+	print('Out Catalog file: %s' % opt_catalog)
 
 	print('\n\n')
 
@@ -538,6 +562,10 @@ def main(argv):
 
 	if (opt_dot != None):
 		output_dot(opt_dot, opt_title)
+
+	if (opt_catalog != None):
+		out_catalog(opt_catalog)
+
 
 
 def load_json_conf(json_file):
@@ -708,6 +736,27 @@ def output_dot(dot_file, title):
 	else:
 		output_func(dot_file)
 		print 'Created graph: %s' % (dot_file)
+
+
+def out_catalog(filename):
+	try:
+		f = open(filename, 'w')
+	except:
+		print 'Unable to open catalog file "%s"' % filename
+		return
+
+	for n in nodes:
+		# pull info here that wasn't needed for the graph
+		serial = ''
+		bootf = ''
+		
+		if (n['ip']):
+			serial = get_snmp_val(n['ip'], n['cred'], OID_SYS_SERIAL)
+			bootf  = get_snmp_val(n['ip'], n['cred'], OID_SYS_BOOT)
+
+		f.write('"%s","%s","%s","%s","%s"\n' % (n['name'], n['ip'], n['plat'], serial, bootf))
+
+	f.close()
 
 
 if __name__ == "__main__":
