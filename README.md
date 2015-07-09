@@ -21,9 +21,12 @@ My bitcoin address is: **`14J9R95Sru4d489W1B4Mk3hh1bWpBV9Rpb`**
 
 ### Summary
 
-MNet-Graph crawls a network and builds a detailed DOT diagram (.png output).
+`# mnet-graph.py -r <root IP> <-f <file>> [-d <depth>] [-c <config file>] [-t <diagram title>] [-C <catalog file>]`
 
-`# mnet-graph.py -r <root IP> <-f <file>> [-d <depth>] [-c <config file>] [-t <diagram title>]`
+MNet-Graph crawls a network and builds a detailed DOT diagram (.png output).  
+  
+If the -C option is used a catalog file (csv) of the discovery will be created.
+
 
 ### Requirements
 
