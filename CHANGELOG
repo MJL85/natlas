@@ -4,6 +4,11 @@ MNet-Graph
 
 ----------
 
+v0.4 - 7/10/2015
+	- Improved speed.
+	- Cleaned up code base.
+	- Made PyNetAddr optional (change USE_NETADDR=1 to USE_NETADDR=0 to disable)
+
 v0.3 - 7/8/2015
 	- Added -C option to write a catalog of the discovery to a csv file.
 	- Runs for ~1/4 the time.
