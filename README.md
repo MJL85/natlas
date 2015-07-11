@@ -59,7 +59,8 @@ The toolset uses a JSON configuration file for common parameters.
 	"subnets" : [  
 		"10.0.0.0/8"  
 	]  
-}```
+}
+```
 
 The **snmp** block defines a list of SNMP credentials.  When connecting to a node, each of these credentials is tried in order until one is successful.  This allows crawling a large network with devices that potentially use different SNMP credentials.  
 [mnet-graph only] The **domains** block defines a list of domains that should be stripped off of the device names.  For example, if is switch is found with the name *SW1.company.com*, the above example will only show *SW1* in the output.  
