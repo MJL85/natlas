@@ -1,0 +1,8 @@
+*.py[cod]
+*.egg
+*.egg-info
+dist
+*~
+mnet.conf
+*.log
+
