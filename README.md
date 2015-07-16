@@ -16,6 +16,7 @@ My bitcoin address is: **`14J9R95Sru4d489W1B4Mk3hh1bWpBV9Rpb`**
 
 # Suite Tools
 1. MNet-Graph
+1. MNet-TraceMAC
 
 ## MNet-Graph
 
@@ -63,11 +64,11 @@ The toolset uses a JSON configuration file for common parameters.
 ```
 
 The **snmp** block defines a list of SNMP credentials.  When connecting to a node, each of these credentials is tried in order until one is successful.  This allows crawling a large network with devices that potentially use different SNMP credentials.  
-[mnet-graph only] The **domains** block defines a list of domains that should be stripped off of the device names.  For example, if is switch is found with the name *SW1.company.com*, the above example will only show *SW1* in the output.  
+The **domains** block defines a list of domains that should be stripped off of the device names.  For example, if is switch is found with the name *SW1.company.com*, the above example will only show *SW1* in the output.  
   
-[mnet-graph only] The **subnets** block defines a list of nodes that should be allowed to be discovered during the discovery process. If a node is discovered as being a neighbor to a node currently being crawled, the neighbor will only be crawled if it is in one of the CIDR ranges defined here. Therefore this list defines the subnets that are allowed to be included in the discovery process, but does not itself define the range of devices to be discovered.
+The **subnets** block defines a list of nodes that should be allowed to be discovered during the discovery process. If a node is discovered as being a neighbor to a node currently being crawled, the neighbor will only be crawled if it is in one of the CIDR ranges defined here. Therefore this list defines the subnets that are allowed to be included in the discovery process, but does not itself define the range of devices to be discovered.
 
-[mnet-graph only] The **exclude** block defines a list of nodes that should be skipped entirely during the discovery process. Since the node is skipped nothing beyond it will be discovered.
+The **exclude** block defines a list of nodes that should be skipped entirely during the discovery process. Since the node is skipped nothing beyond it will be discovered.
 
 
 ### Details
@@ -112,3 +113,51 @@ Example 2
 
 Example 3
 ![MNet-Graph Ex3](http://i.imgur.com/i1dqM09.png "MNet-Graph Ex3")
+
+## MNet-TraceMAC
+
+### Summary
+
+`# mnet-tracemac.py -r <root IP> -m <MAC Address> [-c <config file>]`
+
+MNet-TraceMAC traces through a switched network to identify the port where the
+specified MAC address is located.
+
+### Examples
+
+The below example shows a trace for MAC address `00:23:68:63:75:70` starting
+at node `10.10.0.3`.  The MAC address is found on switch `IDF3_D` on port
+`Gi0/11`.
+
+```
+# mnet-tracemac.py -r 10.10.0.3 -m 0023.6863.7570
+MNet-TraceMAC v0.1
+Written by Michael Laforest <mjlaforest@gmail.com>
+
+     Config file: ./mnet.conf
+       Root node: 10.10.0.3
+     MAC address: 0023.6863.7570
+
+
+
+Start trace.
+------------
+IDF1_A (10.10.0.3)
+          VLAN: 1
+          Port: Gi1/3
+     Next Node: IDF1_B
+  Next Node IP: 10.10.0.2
+------------
+IDF1_B (10.10.0.2)
+          VLAN: 1
+          Port: Gi0/24
+     Next Node: IDF3_D
+  Next Node IP: 10.10.0.6
+------------
+IDF3_D (10.10.0.6)
+          VLAN: 1
+          Port: Gi0/11
+------------
+Trace complete.
+```
+
