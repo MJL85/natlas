@@ -15,14 +15,15 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 '''
 
 from setuptools import setup
+import os
 
 import imp
-_version = imp.load_source('', 'mnet-suite/_version.py')
+_version = imp.load_source('', 'mnetsuite/_version.py')
 
 long_description = open('README.md').read()
 
 setup(
-	name				= 'mnet-suite',
+	name				= 'mnet',
 	version				= _version.__version__,
 	author				= 'Michael Laforest',
 	author_email		= 'mjlaforest@gmail.com',
@@ -42,8 +43,11 @@ setup(
 		'Topic :: Utilities'
 	],
 
-	packages = ['mnet-suite'],
+	packages = ['mnetsuite'],
 	include_package_data = True,
+
+	scripts = [ 'mnet.py' ],
+
 	install_requires = [
 		'pysnmp>=4.2.5',
 		'pydot>=1.0.28',
