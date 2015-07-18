@@ -4,6 +4,10 @@ MNet-Graph
 
 ----------
 
+v0.6 -
+	- Changed from PyDot to PyDot2
+	- Fixed bug with CDP neighbor that did not advertise an IP (reported by Kent Coble)
+
 v0.4 - 7/10/2015
 	- Improved speed.
 	- Cleaned up code base.

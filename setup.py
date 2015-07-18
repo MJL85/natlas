@@ -50,7 +50,7 @@ setup(
 
 	install_requires = [
 		'pysnmp>=4.2.5',
-		'pydot>=1.0.28',
+		'pydot2',
 		'netaddr>=0.7.14'
 	]
 )
