@@ -43,31 +43,40 @@ def print_syntax():
 			'  mnet.py tracemac -r <root IP>\n'
 			'                   -m <MAC Address>\n'
 			'                   [-c <config file>]\n'
+			'\n'
+			'  mnet.py config\n'
 		)
 
 
-def main(argv):
+def print_banner():
 	print('MNet Suite v%s' % mnetsuite.__version__)
 	print('Written by Michael Laforest <mjlaforest@gmail.com>')
 	print('')
 
+
+def main(argv):
 	opt_root_ip = None
 	if (len(argv) < 1):
+		print_banner()
 		print_syntax()
 		return
 
 	mod = argv[0]
 	if (mod == 'graph'):
+		print_banner()
 		graph(argv[1:])
 	elif (mod == 'tracemac'):
+		print_banner()
 		tracemac(argv[1:])
+	elif (mod == 'config'):
+		generate_config()
 	else:
+		print_banner()
 		print_syntax()
 
 
 def graph(argv):
 	max_depth = 0
-	config = None
 
 	graph = mnetsuite.mnet_graph()
 
@@ -177,6 +186,11 @@ def tracemac(argv):
 		print('------------')
 
 	print('Trace complete.\n')
+
+
+def generate_config():
+	conf = mnetsuite.config.mnet_config()
+	print('%s' % conf.generate_new())
 
 
 if __name__ == "__main__":

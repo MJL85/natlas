@@ -26,11 +26,16 @@
 
 import json
 
+class mnet_config_graph:
+	node_text_size = 8
+	link_text_size = 7
+
 class mnet_config:
 	host_domains	= []
 	snmp_creds		= []
 	exclude_subnets	= []
 	allowed_subnets	= []
+	graph = mnet_config_graph()
 
 	def __init__(self):
 		return
@@ -46,6 +51,11 @@ class mnet_config:
 		self.exclude_subnets	= json_data['exclude']
 		self.allowed_subnets	= json_data['subnets']
 
+		json_graph = json_data.get('graph', None)
+		if (json_graph != None):
+			self.graph.node_text_size = json_graph.get('node_text_size', 8)
+			self.graph.link_text_size = json_graph.get('link_text_size', 7)
+
 		return 1
 
 	def _load_json_conf(self, json_file):
@@ -59,4 +69,26 @@ class mnet_config:
 			return None
 
 		return json_data
+
+	def generate_new(self):
+		return '{\n' \
+				'	"snmp" : [\n' \
+				'		{ "community":"private",	"ver":2 },\n' \
+				'		{ "community":"public",		"ver":2 }\n' \
+				'	],\n' \
+				'	"domains" : [\n' \
+				'		".company.net",\n' \
+				'		".company.com"\n' \
+				'	],\n' \
+				'	"exclude" : [\n' \
+				'		"192.168.0.0/16"\n' \
+				'	],\n' \
+				'	"subnets" : [\n' \
+				'		"10.0.0.0/8"\n' \
+				'	],\n' \
+				'	"graph" : {\n' \
+				'		"node_text_size" : 10,\n' \
+				'		"link_text_size" : 9\n' \
+				'	}\n' \
+				'}'
 

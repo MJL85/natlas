@@ -7,6 +7,9 @@ MNet-Graph
 v0.6 -
 	- Changed from PyDot to PyDot2
 	- Fixed bug with CDP neighbor that did not advertise an IP (reported by Kent Coble)
+	- Added config file option to change font size for node text
+	- Added config file option to change font size for link text
+	- Added command line module option to output a default config file
 
 v0.4 - 7/10/2015
 	- Improved speed.
