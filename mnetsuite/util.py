@@ -185,7 +185,7 @@ def shorten_host_name(host, domains):
 # Return a string representation of an IPv4 address
 #
 def convert_ip_int_str(iip):
-	if (iip != None):
+	if ((iip != None) & (iip != '')):
 		ip = int(iip, 0)
 		ip = '%i.%i.%i.%i' % (((ip >> 24) & 0xFF), ((ip >> 16) & 0xFF), ((ip >> 8) & 0xFF), (ip & 0xFF))
 		return ip

@@ -57,7 +57,7 @@ class mnet_graph:
 	# Recurse down a level if 'depth' > 0
 	#
 	def crawl_node(self, ip, depth):
-		if (self.is_node_allowed(ip) == 0):
+		if ((self.is_node_allowed(ip) == 0) | (ip == 'UNKNOWN')):
 			return
 
 		snmpobj = mnet_snmp(ip)
@@ -200,6 +200,9 @@ class mnet_graph:
 	# Returns 1 if the IP is allowed to be crawled.
 	#
 	def is_node_allowed(self, ip):
+		if (ip == 'UNKNOWN'):
+			return 1
+
 		ipaddr = None
 		if (USE_NETADDR):
 			ipaddr = IPAddress(ip)
