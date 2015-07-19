@@ -193,3 +193,19 @@ IDF3_D (10.10.0.6)
 ------------
 Trace complete.
 ```
+
+# FAQ
+
+**Q.** `My diagram is too large.  I only want to diagram part of my network.`
+
+**A.** Check out the config options `subnets` and `exclude`.  You can specifically exclude CIDR's if you do not want them included in your diagram.  
+  
+In addition, suppose you wanted to prune part of the network off and only display the rest.  You can add the IP addresses of the first node to be pruned to the `exclude` list in the config file (ex: `10.55.102.33/32`), then run mnet graph from the new root node.  As mnet crawls outward and reaches the first node that you pruned, the exclude list will prevent mnet from including it and mnet will not continue crawling in that direction.  
+  
+**Q.** `Where is the config file?`  
+  
+*A.* If you need a config file you can generate a new one with `# mnet.py config > mnet.conf` .
+
+**Q.** `Who are you?`  
+  
+*A.* I'm a network engineer with a background in programming.  I write mostly in C.  I wrote [wiiuse](http://sf.net/projects/wiiuse), a small Nintendo Wii remote library which became somewhat popular among the homebrew developers, and a multithreaded realtime syslog analysis and alerting daemon.  I work for a small company and wrote MNet on my spare time so if you like it and want to donate I'd really appreciate it!
