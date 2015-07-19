@@ -6,7 +6,7 @@ mjlaforest@gmail.com
 CHANGE LOG
 --------------------
 
-v0.6 -
+v0.6 - 7/19/2015
 	graph
 	- Changed from PyDot to PyDot2
 	- Fixed bug with CDP neighbors that do not advertise an IP (reported by Kent Coble)
