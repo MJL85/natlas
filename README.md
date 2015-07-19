@@ -20,6 +20,12 @@ My bitcoin address is: **`14J9R95Sru4d489W1B4Mk3hh1bWpBV9Rpb`**
 | Graph | Crawls a network and builds a diagram based on CDP neighbor information. |
 | TraceMAC | Attempts to locate a specific MAC address by recursively looking it up in switch CAM tables. |
 
+# Installing MNet
+
+MNet Suite can be installed through Python's pip.  
+  
+`# pip install mnet`
+
 # Running MNet
 
 ### Graph Module
