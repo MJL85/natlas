@@ -71,6 +71,14 @@ class mnet_graph:
 
 
 	def _get_node(self, ip, depth):
+		# vmware ESX reports the IP as 0.0.0.0
+		# return a minimal node since we don't have
+		# a real IP.
+		if (ip == '0.0.0.0'):
+			d = mnet_node(name = 'UNKNOWN', ip = ip)
+			self.nodes.append(d)
+			return d
+
 		snmpobj = mnet_snmp(ip)
 
 		# find valid credentials for this node
@@ -155,9 +163,20 @@ class mnet_graph:
 			return
 		node.crawled = 1
 
+		# vmware ESX can report IP as 0.0.0.0
+		# If we are allowing 0.0.0.0/32 in the config,
+		# then we added it as a leaf, but don't crawl it
+		if (node.ip == '0.0.0.0'):
+			return
+
 		# may be a leaf we couldn't connect to previously
 		if (node.snmp_cred == None):
 			return
+
+		# print some info to stdout
+		for i in range(0, depth):
+			sys.stdout.write('>')
+		print('%s (%s)' % (node.name, node.ip))
 
 		# get the cached snmp credentials
 		snmpobj = mnet_snmp(node.ip)

@@ -29,6 +29,7 @@ USE_NETADDR = 1
 
 import re
 import struct
+import binascii
 
 from snmp import *
 from config import mnet_config
@@ -173,11 +174,19 @@ def shorten_host_name(host, domains):
 	if (host == None):
 		return 'UNKNOWN'
 
+	# some Motorola devices report as hex strings
+#	if (host.startswith('0x')):
+#		try:
+#			host = binascii.unhexlify(host[2:])
+#		except:
+#			pass
+
 	# Nexus appends (SERIAL) to hosts
 	host = re.sub('\([^\(]*\)$', '', host)
 	for domain in domains:
 		host = host.replace(domain, '')
 
+	host = re.sub('-', '_', host)
 	return host
 
 
