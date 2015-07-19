@@ -125,7 +125,7 @@ def graph(argv):
 	graph.set_max_depth(opt_depth)
 
 	# start
-	graph.crawl_node(opt_root_ip, opt_depth)
+	graph.crawl(opt_root_ip)
 		
 	# outputs
 	graph.output_stdout()

@@ -29,16 +29,18 @@ import getopt
 import pydot
 import datetime
 import os
+import binascii
 
 from snmp import *
 from config import mnet_config
 from util import *
-from node import mnet_node
+from node import mnet_node, mnet_node_link
 from _version import __version__
 
 class mnet_graph:
+	root_node = None
+
 	nodes = []
-	links = []
 	max_depth = 0
 	config = None
 
@@ -52,29 +54,43 @@ class mnet_graph:
 	def set_max_depth(self, depth):
 		self.max_depth = depth
 
-	#
-	# Crawl device at this IP.
-	# Recurse down a level if 'depth' > 0
-	#
-	def crawl_node(self, ip, depth):
-		if ((self.is_node_allowed(ip) == 0) | (ip == 'UNKNOWN')):
-			return
 
+	def _reset_crawled(self):
+		for n in self.nodes:
+			n.crawled = 0
+
+
+	def crawl(self, ip):
+		# pull info for this node
+		node = self._get_node(ip, 0)
+		if (node != None):
+			self._crawl_node(node, 0)
+		
+		self.root_node = node
+		return
+
+
+	def _get_node(self, ip, depth):
 		snmpobj = mnet_snmp(ip)
 
 		# find valid credentials for this node
 		if (snmpobj.get_cred(self.config.snmp_creds) == 0):
-			return
+			for i in range(0, depth):
+				sys.stdout.write('.')
+			print('UNKNOWN (%s)            << UNABLE TO CONNECT WITH SNMP' % ip)
+			d = mnet_node(name = 'UNKNOWN',	ip = ip)
+			self.nodes.append(d)
+			return d
 
 		system_name = shorten_host_name(snmpobj.get_val(OID_SYSNAME), self.config.host_domains)
 
-		# prevent loops by checking if we've already done this node by host name
+		# verify this node isn't already in our visited list
 		for ex in self.nodes:
 			if (ex.name == system_name):
-				return
+				return ex
 
 		# print some info to stdout
-		for i in range(0, self.max_depth - depth):
+		for i in range(0, depth):
 			sys.stdout.write('.')
 		print('%s (%s)' % (system_name, ip))
 
@@ -119,13 +135,36 @@ class mnet_graph:
 				vss_enable		= vss_enable,
 				vss_domain		= vss_domain
 			)
+		d.snmp_cred = snmpobj._cred
 		self.nodes.append(d)
+		return d
 
-		if (depth <= 0):
+
+	#
+	# Crawl device at this IP.
+	# Recurse down a level if 'depth' > 0
+	#
+	def _crawl_node(self, node, depth):
+		if (node == None):
 			return
-						
-		children = []
 
+		if (depth >= self.max_depth):
+			return
+					
+		if (node.crawled > 0):
+			return
+		node.crawled = 1
+
+		# may be a leaf we couldn't connect to previously
+		if (node.snmp_cred == None):
+			return
+
+		# get the cached snmp credentials
+		snmpobj = mnet_snmp(node.ip)
+		snmpobj._cred = node.snmp_cred
+
+		children = []
+		
 		# get list of CDP neighbors
 		cdp_vbtbl = snmpobj.get_bulk(OID_CDP)
 		if (cdp_vbtbl == None):
@@ -162,6 +201,20 @@ class mnet_graph:
 				rport = snmpobj.cache_lookup(cdp_vbtbl, OID_CDP_DEVPORT + '.' + ifidx + '.' + t[15])
 				rport = shorten_port_name(rport)
 
+				# get remote platform
+				rplat = snmpobj.cache_lookup(cdp_vbtbl, OID_CDP_DEVPLAT + '.' + ifidx + '.' + t[15])
+
+				# get IOS version
+				rios = snmpobj.cache_lookup(cdp_vbtbl, OID_CDP_IOS + '.' + ifidx + '.' + t[15])
+				if (rios != None):
+					try:
+						rios = binascii.unhexlify(rios[2:])
+					except:
+						pass
+					rios_s = re.search('Version:? ([^ ,]*)', rios)
+					if (rios_s):
+						rios = rios_s.group(1)
+
 				# get link type (trunk ?)
 				link_type = snmpobj.cache_lookup(link_type_vbtbl, OID_VTP_TRUNK + '.' + ifidx)
 
@@ -175,25 +228,33 @@ class mnet_graph:
 				# get IP address
 				lifip = get_ip_from_ifidx(snmpobj, ifip_vbtbl, ifidx)
 
-				link = {}
-				link['lip']			= ip
-				link['lname']		= system_name
-				link['lport']		= lport
-				link['rname']		= shorten_host_name(val.prettyPrint(), self.config.host_domains)
-				link['rport']		= rport
-				link['rip']			= rip
-				link['link_type']	= link_type
-				link['llag']		= lag
-				link['rlag']		= None
-				link['vlan']		= vlan
-				link['lifip']		= lifip
-				link['rifip']		= None
-				
-				self.add_link(link)
-				children.append(rip)
-						
+				# get the child info
+				if ((self.is_node_allowed(rip) == 1) & (rip != 'UNKNOWN')):
+					child = self._get_node(rip, depth+1)
+					if (child != None):
+						# if we couldn't pull info from SNMP fill in what we know
+						if (child.snmp_cred == None):
+							child.name = shorten_host_name(val.prettyPrint(), self.config.host_domains)
+
+						# always prefer CDP advertised platform over what we pulled from SNMP
+						child.plat = rplat.replace('cisco ', '')
+						child.ios = rios
+
+						# link child to parent
+						link = mnet_node_link(node			= child,
+											link_type		= link_type,
+											vlan			= vlan,
+											local_port		= lport,
+											remote_port		= rport,
+											local_lag		= lag,
+											remote_lag		= None,
+											local_if_ip		= lifip,
+											remote_if_ip	= None)
+						self.add_link(node, link)
+						children.append(child)
+
 		for child in children:
-			self.crawl_node(child, depth-1)
+			self._crawl_node(child, depth+1)
 
 
 	#
@@ -231,69 +292,165 @@ class mnet_graph:
 		return 0
 
 
-	def add_link(self, node):
-		for link in self.links:
-			if (	  (node['lname'] == link['lname'])
-					& (node['lport'] == link['lport'])
-					& (node['rname'] == link['rname'])
-					& (node['rport'] == link['rport'])
-					):
-				# same mapping in the same direction.
-				return
-			if (	  (node['lname'] == link['rname'])
-					& (node['lport'] == link['rport'])
-					& (node['rname'] == link['lname'])
-					& (node['rport'] == link['lport'])
-					):
-				# same mapping in opposite direction.
-				# maybe we can save the local IP address if we have one
-				if ((node['lifip'] != 'UNKNOWN') & (link['rifip'] == None)):
-					link['rifip'] = node['lifip']
-				if ((node['llag'] != 'UNKNOWN') & (link['rlag'] == None)):
-					link['rlag'] = node['llag']
+	def add_link(self, node, link):
+		if (link.node.crawled == 1):
+			# both nodes have been crawled,
+			# so try to update existing reverse link info
+			# instead of adding a new link
+			for n in self.nodes:
+				# find the child, which was the original parent
+				if (n.name == link.node.name):
+					# find the existing link
+					for ex_link in n.links:
+						if ((ex_link.node.name == node.name) & (ex_link.local_port == link.remote_port)):
+							if ((link.local_if_ip != 'UNKNOWN') & (ex_link.remote_if_ip == None)):
+								ex_link.remote_if_ip = link.local_if_ip
+							if ((link.local_lag != 'UNKNOWN') & (ex_link.remote_lag == None)):
+								ex_link.remote_lag = link.local_lag
+							return
 
-				return
+		node.add_link(link)
+		return
 
-		self.links.append(node)
+
+	def _output_stdout(self, node):
+		if (node == None):
+			return (0, 0)
+		if (node.crawled > 0):
+			return (0, 0)
+		node.crawled = 1
+
+		ret_nodes = 1
+		ret_links = 0
+
+		print('-----------------------------------------')
+		print('      Name: %s' % node.name)
+		print('        IP: %s' % node.ip)
+		print('  Platform: %s' % node.plat)
+		print('   IOS Ver: %s' % node.ios)
+		print('   Routing: %s' % ('yes' if (node.router == 1) else 'no'))
+		print('   OSPF ID: %s' % node.ospf_id)
+		print('   BGP LAS: %s' % node.bgp_las)
+		print('  HSRP Pri: %s' % node.hsrp_pri)
+		print('  HSRP VIP: %s' % node.hsrp_vip)
+		print(' Stack Cnt: %i' % node.stack_count)
+		print('  VSS Mode: %i' % node.vss_enable)
+		print('VSS Domain: %s' % node.vss_domain)
+
+		print('     Links:')
+		for link in node.links:
+			print('       %s -> %s:%s' % (link.local_port, link.node.name, link.remote_port))
+			ret_links += 1
+
+		for link in node.links:
+			rn, rl = self._output_stdout(link.node)
+			ret_nodes += rn
+			ret_links += rl
+
+		return (ret_nodes, ret_links)
 
 
 	def output_stdout(self):
+		self._reset_crawled()
+
 		print('-----')
 		print('----- DEVICES')
 		print('-----')
+		num_nodes, num_links = self._output_stdout(self.root_node)
 
-		for n in self.nodes:
-			print('      Name: %s' % n.name)
-			print('        IP: %s' % n.ip)
-			print('  Platform: %s' % n.plat)
-			print('   Routing: %s' % ('yes' if (n.router == 1) else 'no'))
-			print('   OSPF ID: %s' % n.ospf_id)
-			print('   BGP LAS: %s' % n.bgp_las)
-			print('  HSRP Pri: %s' % n.hsrp_pri)
-			print('  HSRP VIP: %s' % n.hsrp_vip)
-			print(' Stack Cnt: %i' % n.stack_count)
-			print('  VSS Mode: %i' % n.vss_enable)
-			print('VSS Domain: %s' % n.vss_domain)
-			print
+		print('Discovered devices: %i' % num_nodes)
+		print('Discovered links:   %i' % num_links)
 
-		print('-----')
-		print('----- LINKS')
-		print('-----')
 
-		for link in self.links:
-			print('[%s] %s:%s -(%s)-> %s:%s' % (link['link_type'], link['lname'], link['lport'], link['llag'], link['rname'], link['rport']))
-			if ((link['lifip'] != None) | (link['rifip'] != None)):
-				print('    %s -> %s' % (link['lifip'], link['rifip']))
+	def _output_dot(self, graph, node):
+		if (node == None):
+			return (0, 0)
+		if (node.crawled > 0):
+			return (0, 0)
+		node.crawled = 1
 
-		print('-----')
-		print('----- Summary')
-		print('-----')
+		node_label = '<font point-size="10"><b>%s</b></font><br />' \
+						'<font point-size="8"><i>%s</i></font><br />' \
+						'%s<br />%s' \
+						% (node.name, node.ip, node.plat, node.ios)
+		node_style = 'solid'
+		node_shape = 'ellipse'
+		node_peripheries = 1
 
-		print('Discovered devices: %i' % (len(self.nodes)))
-		print('Discovered links:   %i' % (len(self.links)))
+		if (node.vss_enable == 1):
+			node_label += '<br />VSS %s' % node.vss_domain
+			node_peripheries = 2
+
+		if (node.stack_count > 0):
+			node_label += '<br />Stackwise %i' % node.stack_count
+			node_peripheries = node.stack_count
+
+		if (node.router == 1):
+			node_shape = 'diamond'
+			if (node.bgp_las != None):
+				node_label += '<br />BGP %s' % node.bgp_las
+			if (node.ospf_id != None):
+				node_label += '<br />OSPF %s' % node.ospf_id
+			if (node.hsrp_pri != None):
+				node_label += '<br />HSRP VIP %s' \
+								'<br />HSRP Pri %s' % (node.hsrp_vip, node.hsrp_pri)
+
+		graph.add_node(
+				pydot.Node(
+					name = node.name,
+					label = '<%s>' % node_label,
+					style = node_style,
+					shape = node_shape,
+					peripheries = node_peripheries
+				)
+		)
+
+		for link in node.links:
+			self._output_dot(graph, link.node)
+
+			link_color = 'black'
+			link_style = 'solid'
+
+			link_label = 'P:%s\nC:%s' % (link.local_port, link.remote_port)
+
+			# LAG
+			if (link.local_lag != 'UNKNOWN'):
+				link_label += '\nP:%s | C:%s' % (link.local_lag, link.remote_lag)
+
+			# IP Addresses
+			if ((link.local_if_ip != 'UNKNOWN') & (link.local_if_ip != None)):
+				link_label += '\nP:%s' % link.local_if_ip
+			if ((link.remote_if_ip != 'UNKNOWN') & (link.remote_if_ip != None)):
+				link_label += '\nC:%s' % link.remote_if_ip
+					
+			if (link.link_type == '1'):
+				# Trunk = Bold/Blue
+				link_color = 'blue'
+				link_style = 'bold'
+			elif (link.link_type is None):
+				# Routed = Bold/Red
+				link_color = 'red'
+				link_style = 'bold'
+			else:
+				# Switched, include VLAN ID in label
+				if (link.vlan != None):
+					link_label += '\nVLAN %s' % link.vlan
+
+			graph.add_edge(
+					pydot.Edge(
+						node.name, link.node.name,
+						dir = 'forward',
+						label = link_label,
+						color = link_color,
+						style = link_style
+					)
+			)
+
 
 
 	def output_dot(self, dot_file, title):
+		self._reset_crawled()
+
 		credits = '<table border="0">' \
 					'<tr>' \
 					 '<td balign="right">' \
@@ -330,80 +487,8 @@ class mnet_graph:
 				labeljust = 'l'
 		)
 
-		for n in self.nodes:
-			node_label = '<font point-size="10"><b>%s</b></font><br />' \
-							'<font point-size="8"><i>%s</i></font><br />' \
-							'%s'	% (n.name, n.ip, n.plat)
-			node_style = 'solid'
-			node_shape = 'ellipse'
-			node_peripheries = 1
-
-			if (n.vss_enable == 1):
-				node_label += '<br />VSS %s' % n.vss_domain
-				node_peripheries = 2
-
-			if (n.stack_count > 0):
-				node_label += '<br />Stackwise %i' % n.stack_count
-				node_peripheries = n.stack_count
-
-			if (n.router == 1):
-				node_shape = 'diamond'
-				if (n.bgp_las != None):
-					node_label += '<br />BGP %s' % n.bgp_las
-				if (n.ospf_id != None):
-					node_label += '<br />OSPF %s' % n.ospf_id
-				if (n.hsrp_pri != None):
-					node_label += '<br />HSRP VIP %s' \
-									'<br />HSRP Pri %s' % (n.hsrp_vip, n.hsrp_pri)
-
-			graph.add_node(
-					pydot.Node(
-						name = n.name,
-						label = '<%s>' % node_label,
-						style = node_style,
-						shape = node_shape,
-						peripheries = node_peripheries
-					)
-			)
-
-		for link in self.links:
-			link_color = 'black'
-			link_style = 'solid'
-
-			link_label = 'P:%s\nC:%s' % (link['lport'], link['rport'])
-
-			# LAG
-			if (link['llag'] != 'UNKNOWN'):
-				link_label += '\nP:%s | C:%s' % (link['llag'], link['rlag'])
-
-			# IP Addresses
-			if ((link['lifip'] != 'UNKNOWN') & (link['lifip'] != None)):
-				link_label += '\nP:%s' % link['lifip']
-			if ((link['rifip'] != 'UNKNOWN') & (link['rifip'] != None)):
-				link_label += '\nC:%s' % link['rifip']
-					
-			if (link['link_type'] == '1'):
-				# Trunk = Bold/Blue
-				link_color = 'blue'
-				link_style = 'bold'
-			elif (link['link_type'] is None):
-				# Routed = Bold/Red
-				link_color = 'red'
-				link_style = 'bold'
-			else:
-				# Switched, include VLAN ID in label
-				if (link['vlan'] != None):
-					link_label += '\nVLAN %s' % link['vlan']
-
-			graph.add_edge(
-					pydot.Edge(
-						link['lname'], link['rname'],
-						dir = 'forward',
-						label = link_label,
-						color = link_color,
-						style = link_style
-					)
-			)
+		# add all of the nodes and links
+		self._output_dot(graph, self.root_node)
 
 		# get file extension
 		file_name, file_ext = os.path.splitext(dot_file)
@@ -435,7 +520,7 @@ class mnet_graph:
 				serial = snmpobj.get_val(OID_SYS_SERIAL)
 				bootf  = snmpobj.get_val(OID_SYS_BOOT)
 
-			f.write('"%s","%s","%s","%s","%s"\n' % (n.name, n.ip, n.plat, serial, bootf))
+			f.write('"%s","%s","%s","%s","%s"\n' % (n.name, n.ip, n.plat, n.ios, serial, bootf))
 
 		f.close()
 
