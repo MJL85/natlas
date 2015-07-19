@@ -8,7 +8,7 @@ The tools are centrally focused on Cisco devices.
 
 # Support
 
-If you use any of these tools and like them please consider donating.  
+If you use any of these tools or find them useful please consider donating.  
 
 My bitcoin address is: **`14J9R95Sru4d489W1B4Mk3hh1bWpBV9Rpb`**
 
