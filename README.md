@@ -104,8 +104,8 @@ The toolset uses a JSON configuration file for common parameters.
 | Block / Variable | Description |
 | --- | --- |
 | `snmp` | Defines a list of SNMP credentials.  When connecting to a node, each of these credentials is tried in order until one is successful.  This allows crawling a large network with devices that potentially use different SNMP credentials. |
-| `domains` | Defines a list of domains that should be stripped off of the device names.  For example, if is switch is found with the name *SW1.company.com*, the above example will only show *SW1* in the output. |
-| `subnets` | Defines a list of nodes that should be allowed to be discovered during the discovery process. If a node is discovered as being a neighbor to a node currently being crawled, the neighbor will only be crawled if it is in one of the CIDR ranges defined here. Therefore this list defines the subnets that are allowed to be included in the discovery process, but does not itself define the range of devices to be discovered. |
+| `domains` | Defines a list of domains that should be stripped off of the device names.  For example, if a switch is found with the name *SW1.company.com*, the above example will only show *SW1* in the output. |
+| `subnets` | Defines a list of nodes that should be allowed to be discovered during the discovery process. If a node is discovered as being a neighbor to a node currently being crawled, the neighbor will only be crawled if it is in one of the CIDR ranges defined here. Therefore this list defines the subnets that are allowed to be included in the discovery process, but does not itself define the range of devices to be discovered (i.e. mnet will not do a sweep across all IP addresses in the defined subnets). |
 | `exclude` | Defines a list of nodes that should be skipped entirely during the discovery process. Since the node is skipped nothing beyond it will be discovered. |
 | `graph` | Defines specific values used to change graph attributes.  `node_text_size` and `link_text_size` are supported and are both integers. |
 
@@ -113,9 +113,9 @@ The toolset uses a JSON configuration file for common parameters.
 
 ### Details
 
-The graph module starts at a defined root node and recursively traverses neighboring devices (discovered via CDP) until a defined depth is reached.  The script collects data using SNMP.
+The graph module starts at a defined root node and recursively traverses neighboring devices (discovered via CDP) until a defined depth is reached.  Data is collected using SNMP.
 
-MNet-Graph will attempt to collect the following information and include it in the generated diagram:
+MNet will attempt to collect the following information and include it in the generated diagram:
 + All devices (via CDP)
 + Interface names
 + IP addresses
