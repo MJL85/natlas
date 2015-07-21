@@ -8,74 +8,114 @@ The tools are centrally focused on Cisco devices.
 
 # Support
 
-If you use any of these tools and like them please consider donating.  
+If you use any of these tools or find them useful please consider donating.  
 
 My bitcoin address is: **`14J9R95Sru4d489W1B4Mk3hh1bWpBV9Rpb`**
 
 ![14J9R95Sru4d489W1B4Mk3hh1bWpBV9Rpb](http://i.imgur.com/DutGv9A.png "14J9R95Sru4d489W1B4Mk3hh1bWpBV9Rpb")
 
 # Suite Tools
-1. MNet-Graph
-1. MNet-TraceMAC
-
-## MNet-Graph
-
-### Summary
-
-`# mnet-graph.py -r <root IP> <-f <file>> [-d <depth>] [-c <config file>] [-t <diagram title>] [-C <catalog file>]`
-
-MNet-Graph crawls a network and builds a detailed DOT diagram (.png output).  
-  
-If the -C option is used a catalog file (csv) of the discovery will be created.
-
-
-### Requirements
-
-MNet-Graph requires the following:
-
-|   | Tested With Version |
+| Module | Description |
 | --- | --- |
-| **Python** | 2.7 |
-| **PySNMP** | 4.2.5 |
-| **PyDot** | 1.0.28 |
-| **PyNetAddr** | 0.7.14 |
+| Graph | Crawls a network and builds a diagram based on CDP neighbor information. |
+| TraceMAC | Attempts to locate a specific MAC address by recursively looking it up in switch CAM tables. |
 
-### Configuration File
+# Installing MNet
+
+MNet Suite can be installed through Python's pip.  
+  
+`# pip install mnet`
+
+# Running MNet
+
+### Graph Module
+
+```
+mnet.py graph -r <root IP>
+              -f <file>
+              [-d <max depth>]
+              [-c <config file>]
+              [-t <diagram title>]
+              [-C <catalog file>]
+```
+The above command will run the `graph` module and generate a network diagram.
+
+| Option | Description |
+| --- | --- |
+| `-r <root IP>` | IP address of the network node to start on. |
+| `-f <file>` | The file that the output will be written to. `network.png` will create a PNG  file. |
+| `-d <mac depth>` | The maximum depth to crawl into the network starting at the root node specified by `-r` |
+| `-c <config file>` | The JSON configuration file to use. |
+| `-t <diagram title>` | The title to give your generated network diagram. |
+| `-C <catalog file>` | If specified, MNet will generate a comma separated (CSV) catalog file with a list of all devices discovered. |
+
+### TraceMAC Module
+
+```
+mnet.py tracemac -r <root IP>
+                 -m <MAC Address>
+                 [-c <config file>]
+```
+The above command will run the `TraceMAC` module and trace a MAC address through CAM tables.
+
+| Option | Description |
+| --- | --- |
+| `-r <root IP>` | IP address of the network node to start on. |
+| `-m <MAC Address>` | The MAC address to locate.  Can be in any form.  Ex: `11:22:33:44:55:66` or `112233445566` or `1122.3344.5566` |
+| `-c <config file>` | The JSON configuration file to use. |
+
+### Config Module
+
+```
+mnet.py config
+```
+The above command will run the `config` module and output a standard config to stdout.  
+  
+Use this module and redirect stdout to a file in order to create a new blank config file.  
+`# mnet.py config > mnet.conf`
+
+# Configuration File
 
 The toolset uses a JSON configuration file for common parameters.
 
 ```
-{  
-	"snmp" : [  
-		{ "community":"superpublic",	"ver":2 },  
-		{ "community":"public",		"ver":2 }  
-	],  
-	"domains" : [  
-		".company.net",  
-		".company.com"  
-	],  
-	"exclude" : [  
-		"192.168.0.0/16"  
-	],  
-	"subnets" : [  
-		"10.0.0.0/8"  
-	]  
+{
+	"snmp" : [
+		{ "community":"private",	"ver":2 },
+		{ "community":"public",		"ver":2 }
+	],
+	"domains" : [
+		".company.net",
+		".company.com"
+	],
+	"exclude" : [
+		"192.168.0.0/16"
+	],
+	"subnets" : [
+		"10.0.0.0/8"
+	],
+	"graph" : {
+		"node_text_size" : 10,
+		"link_text_size" : 9
+	}
 }
 ```
 
-The **snmp** block defines a list of SNMP credentials.  When connecting to a node, each of these credentials is tried in order until one is successful.  This allows crawling a large network with devices that potentially use different SNMP credentials.  
-The **domains** block defines a list of domains that should be stripped off of the device names.  For example, if is switch is found with the name *SW1.company.com*, the above example will only show *SW1* in the output.  
-  
-The **subnets** block defines a list of nodes that should be allowed to be discovered during the discovery process. If a node is discovered as being a neighbor to a node currently being crawled, the neighbor will only be crawled if it is in one of the CIDR ranges defined here. Therefore this list defines the subnets that are allowed to be included in the discovery process, but does not itself define the range of devices to be discovered.
+| Block / Variable | Description |
+| --- | --- |
+| `snmp` | Defines a list of SNMP credentials.  When connecting to a node, each of these credentials is tried in order until one is successful.  This allows crawling a large network with devices that potentially use different SNMP credentials. |
+| `domains` | Defines a list of domains that should be stripped off of the device names.  For example, if a switch is found with the name *SW1.company.com*, the above example will only show *SW1* in the output. |
+| `subnets` | Defines a list of nodes that should be allowed to be discovered during the discovery process. If a node is discovered as being a neighbor to a node currently being crawled, the neighbor will only be crawled if it is in one of the CIDR ranges defined here. Therefore this list defines the subnets that are allowed to be included in the discovery process, but does not itself define the range of devices to be discovered (i.e. mnet will not do a sweep across all IP addresses in the defined subnets). |
+| `exclude` | Defines a list of nodes that should be skipped entirely during the discovery process. Since the node is skipped nothing beyond it will be discovered. |
+| `graph` | Defines specific values used to change graph attributes.  `node_text_size` and `link_text_size` are supported and are both integers. |
 
-The **exclude** block defines a list of nodes that should be skipped entirely during the discovery process. Since the node is skipped nothing beyond it will be discovered.
-
+# MNet's Graph Module
 
 ### Details
 
-The script starts at a defined root node and recursively traverses neighboring devices (discovered via CDP) until a defined depth is reached.  The script collects data using SNMP.
+The graph module starts at a defined root node and recursively traverses neighboring devices (discovered via CDP) until a defined depth is reached.  Data is collected using SNMP.
 
-MNet-Graph will attempt to collect the following information and include it in the generated diagram:
+MNet will attempt to collect the following information and include it in the generated diagram:
 + All devices (via CDP)
 + Interface names
 + IP addresses
@@ -91,7 +131,7 @@ MNet-Graph will attempt to collect the following information and include it in t
 + VSS Domain
 + Stackwise membership
 
-MNet-Graph attempts to include all of the above information in the diagram in an intuitive way.  The keep the diagram clean, the following are used:
+MNet's Graph module attempts to include all of the above information in the diagram in an intuitive way.  The keep the diagram clean, the following are used:
 + Nodes
   + Circle nodes represent layer 2 switches.
   + Diamond nodes represent layer 3 switches or routers.
@@ -114,14 +154,7 @@ Example 2
 Example 3
 ![MNet-Graph Ex3](http://i.imgur.com/i1dqM09.png "MNet-Graph Ex3")
 
-## MNet-TraceMAC
-
-### Summary
-
-`# mnet-tracemac.py -r <root IP> -m <MAC Address> [-c <config file>]`
-
-MNet-TraceMAC traces through a switched network to identify the port where the
-specified MAC address is located.
+# MNet's TraceMAC Module
 
 ### Examples
 
@@ -161,3 +194,18 @@ IDF3_D (10.10.0.6)
 Trace complete.
 ```
 
+# FAQ
+
+**Q.** `My diagram is too large.  I only want to diagram part of my network.`
+
+**A.** Check out the config options `subnets` and `exclude`.  You can specifically exclude CIDR's if you do not want them included in your diagram.  
+  
+In addition, suppose you wanted to prune part of the network off and only display the rest.  You can add the IP addresses of the first node to be pruned to the `exclude` list in the config file (ex: `10.55.102.33/32`), then run mnet graph from the new root node.  As mnet crawls outward and reaches the first node that you pruned, the exclude list will prevent mnet from including it and mnet will not continue crawling in that direction.  
+  
+**Q.** `Where is the config file?`  
+  
+*A.* If you need a config file you can generate a new one with `# mnet.py config > mnet.conf` .
+
+**Q.** `Who are you?`  
+  
+*A.* I'm a network engineer with a background in programming.  I write mostly in C.  I wrote [wiiuse](http://sf.net/projects/wiiuse), a small Nintendo Wii remote library which became somewhat popular among the homebrew developers, and a multithreaded realtime syslog analysis and alerting daemon.  I work for a small company and wrote MNet on my spare time so if you like it and want to donate I'd really appreciate it!
