@@ -121,7 +121,8 @@ def graph(argv):
 	print('\n\n')
 
 	# load the config
-	graph.load_config(opt_conf)
+	if (graph.load_config(opt_conf) == 0):
+		return
 	graph.set_max_depth(opt_depth)
 
 	# start

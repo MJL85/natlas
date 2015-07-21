@@ -58,6 +58,8 @@ OID_IF_IP		= '1.3.6.1.2.1.4.20.1'					# (BULK)
 OID_IF_IP_ADDR	= '1.3.6.1.2.1.4.20.1.2'				# + a.b.c.d = ifid
 OID_IF_IP_NETM	= '1.3.6.1.2.1.4.20.1.3.'				# + a.b.c.d
 
+OID_SVI_VLANIF	= '1.3.6.1.4.1.9.9.128.1.1.1.1.3'		# cviRoutedVlanIfIndex
+
 OID_OSPF		= '1.3.6.1.2.1.14.1.2.0'
 OID_OSPF_ID		= '1.3.6.1.2.1.14.1.1.0'
 
@@ -179,4 +181,5 @@ class mnet_snmp:
 				if (n.prettyPrint() == name):
 					return v.prettyPrint()
 		return None
+
 
