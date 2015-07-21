@@ -6,6 +6,10 @@ mjlaforest@gmail.com
 CHANGE LOG
 --------------------
 
+v0.7 -
+	graph
+	- Added config option "include_svi" to include SVI info for nodes
+
 v0.6 - 7/19/2015
 	graph
 	- Changed from PyDot to PyDot2

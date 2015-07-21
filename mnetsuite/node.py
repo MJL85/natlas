@@ -58,6 +58,15 @@ class mnet_node_link:
 		self.remote_if_ip	= remote_if_ip
 
 
+class mnet_node_svi:
+	vlan = None
+	ip = None
+
+	def __init__(self, vlan):
+		self.vlan = vlan
+		self.ip = []
+
+
 class mnet_node:
 	snmp_cred = None
 	crawled = 0
@@ -75,6 +84,15 @@ class mnet_node:
 	stack_count		= 0
 	vss_enable		= 0
 	vss_domain		= None
+
+	svis			= []
+
+	# cached MIB trees
+	link_type_vbtbl	= None
+	lag_vbtbl		= None
+	vlan_vbtbl		= None
+	ifname_vbtbl	= None
+	ifip_vbtbl		= None
 
 	def __init__(
 				self,
@@ -107,6 +125,8 @@ class mnet_node:
 		self.stack_count		= stack_count
 		self.vss_enable			= vss_enable
 		self.vss_domain			= vss_domain
+
+		self.svis = []
 
 	def add_link(self, link):
 		self.links.append(link)

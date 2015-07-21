@@ -86,23 +86,29 @@ def get_ip_from_ifidx(snmpobj, ifip_tbl, ifidx):
 			ip = '%s.%s.%s.%s' % (t[10], t[11], t[12], t[13])
 
 			netm = snmpobj.cache_lookup(ifip_tbl, OID_IF_IP_NETM + ip)
-			cidr = 0
 
 			# layer 3 unnumbered interface
 			if (netm == None):
 				return 'Unnumbered'
 
-			mt = netm.split('.')
-			for b in range(0, 4):
-				v = int(mt[b])
-				while (v > 0):
-					if (v & 0x01):
-						cidr += 1
-					v = v >> 1
-
+			cidr = get_net_bits_from_mask(netm)
 			return '%s/%i' % (ip, cidr)
 
 	return 'UNKNOWN'
+
+
+def get_net_bits_from_mask(netm):
+	cidr = 0
+
+	mt = netm.split('.')
+	for b in range(0, 4):
+		v = int(mt[b])
+		while (v > 0):
+			if (v & 0x01):
+				cidr += 1
+			v = v >> 1
+
+	return cidr
 
 
 #

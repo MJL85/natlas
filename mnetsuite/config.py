@@ -29,6 +29,7 @@ import json
 class mnet_config_graph:
 	node_text_size = 8
 	link_text_size = 7
+	include_svi	= False
 
 class mnet_config:
 	host_domains	= []
@@ -55,6 +56,7 @@ class mnet_config:
 		if (json_graph != None):
 			self.graph.node_text_size = json_graph.get('node_text_size', 8)
 			self.graph.link_text_size = json_graph.get('link_text_size', 7)
+			self.graph.include_svi = json_graph.get('include_svi', False)
 
 		return 1
 

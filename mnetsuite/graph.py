@@ -34,8 +34,9 @@ import binascii
 from snmp import *
 from config import mnet_config
 from util import *
-from node import mnet_node, mnet_node_link
+from node import mnet_node, mnet_node_link, mnet_node_svi
 from _version import __version__
+
 
 class mnet_graph:
 	root_node = None
@@ -83,6 +84,7 @@ class mnet_graph:
 
 		# find valid credentials for this node
 		if (snmpobj.get_cred(self.config.snmp_creds) == 0):
+			sys.stdout.write('?')
 			for i in range(0, depth):
 				sys.stdout.write('.')
 			print('UNKNOWN (%s)            << UNABLE TO CONNECT WITH SNMP' % ip)
@@ -98,6 +100,7 @@ class mnet_graph:
 				return ex
 
 		# print some info to stdout
+		sys.stdout.write('?')
 		for i in range(0, depth):
 			sys.stdout.write('.')
 		print('%s (%s)' % (system_name, ip))
@@ -145,6 +148,29 @@ class mnet_graph:
 			)
 		d.snmp_cred = snmpobj._cred
 		self.nodes.append(d)
+
+		# Pull SVI info if needed
+		if (self.config.graph.include_svi == True):
+			d.svi_vbtbl			= snmpobj.get_bulk(OID_SVI_VLANIF)
+			d.ifip_vbtbl		= snmpobj.get_bulk(OID_IF_IP)
+
+			for row in d.svi_vbtbl:
+				for n, v in row:
+					vlan = n.prettyPrint().split('.')[14]
+					svi = mnet_node_svi(vlan)
+					for ifrow in d.ifip_vbtbl:
+						for ifn, ifv in ifrow:
+							if (ifn.prettyPrint().startswith(OID_IF_IP_ADDR)):
+								if (v == ifv):
+									t = ifn.prettyPrint().split('.')
+									svi_ip = ".".join(t[10:])
+									mask = snmpobj.cache_lookup(d.ifip_vbtbl, OID_IF_IP_NETM + svi_ip)
+									nbits = get_net_bits_from_mask(mask)
+									svi_ip = '%s/%i' % (svi_ip, nbits)
+									svi.ip.append(svi_ip)
+
+					d.svis.append(svi)
+
 		return d
 
 
@@ -174,8 +200,9 @@ class mnet_graph:
 			return
 
 		# print some info to stdout
+		sys.stdout.write('>')
 		for i in range(0, depth):
-			sys.stdout.write('>')
+			sys.stdout.write('.')
 		print('%s (%s)' % (node.name, node.ip))
 
 		# get the cached snmp credentials
@@ -185,18 +212,20 @@ class mnet_graph:
 		children = []
 		
 		# get list of CDP neighbors
-		cdp_vbtbl = snmpobj.get_bulk(OID_CDP)
-		if (cdp_vbtbl == None):
+		node.cdp_vbtbl = snmpobj.get_bulk(OID_CDP)
+		if (node.cdp_vbtbl == None):
 			return
 
 		# cache some common MIB trees
-		link_type_vbtbl	= snmpobj.get_bulk(OID_VTP_TRUNK)
-		lag_vbtbl		= snmpobj.get_bulk(OID_LAG_LACP)
-		vlan_vbtbl		= snmpobj.get_bulk(OID_IF_VLAN)
-		ifname_vbtbl	= snmpobj.get_bulk(OID_IFNAME)
-		ifip_vbtbl		= snmpobj.get_bulk(OID_IF_IP)
+		node.link_type_vbtbl	= snmpobj.get_bulk(OID_VTP_TRUNK)
+		node.lag_vbtbl			= snmpobj.get_bulk(OID_LAG_LACP)
+		node.vlan_vbtbl			= snmpobj.get_bulk(OID_IF_VLAN)
+		node.ifname_vbtbl		= snmpobj.get_bulk(OID_IFNAME)
+		
+		if (node.ifip_vbtbl == None):
+			node.ifip_vbtbl		= snmpobj.get_bulk(OID_IF_IP)
 
-		for row in cdp_vbtbl:
+		for row in node.cdp_vbtbl:
 			for name, val in row:
 				# process only if this row is a CDP_DEVID
 				if (name.prettyPrint().startswith(OID_CDP_DEVID) == 0):
@@ -206,7 +235,7 @@ class mnet_graph:
 				ifidx = t[14]
 
 				# get remote IP
-				rip = snmpobj.cache_lookup(cdp_vbtbl, OID_CDP_IPADDR + '.' + ifidx + '.' + t[15])
+				rip = snmpobj.cache_lookup(node.cdp_vbtbl, OID_CDP_IPADDR + '.' + ifidx + '.' + t[15])
 				rip = convert_ip_int_str(rip)
 
 				# if the remote IP is not allowed, stop processing it here
@@ -214,17 +243,17 @@ class mnet_graph:
 					continue
 
 				# get local port
-				lport = get_ifname(snmpobj, ifname_vbtbl, ifidx)
+				lport = get_ifname(snmpobj, node.ifname_vbtbl, ifidx)
 
 				# get remote port
-				rport = snmpobj.cache_lookup(cdp_vbtbl, OID_CDP_DEVPORT + '.' + ifidx + '.' + t[15])
+				rport = snmpobj.cache_lookup(node.cdp_vbtbl, OID_CDP_DEVPORT + '.' + ifidx + '.' + t[15])
 				rport = shorten_port_name(rport)
 
 				# get remote platform
-				rplat = snmpobj.cache_lookup(cdp_vbtbl, OID_CDP_DEVPLAT + '.' + ifidx + '.' + t[15])
+				rplat = snmpobj.cache_lookup(node.cdp_vbtbl, OID_CDP_DEVPLAT + '.' + ifidx + '.' + t[15])
 
 				# get IOS version
-				rios = snmpobj.cache_lookup(cdp_vbtbl, OID_CDP_IOS + '.' + ifidx + '.' + t[15])
+				rios = snmpobj.cache_lookup(node.cdp_vbtbl, OID_CDP_IOS + '.' + ifidx + '.' + t[15])
 				if (rios != None):
 					try:
 						rios = binascii.unhexlify(rios[2:])
@@ -235,17 +264,17 @@ class mnet_graph:
 						rios = rios_s.group(1)
 
 				# get link type (trunk ?)
-				link_type = snmpobj.cache_lookup(link_type_vbtbl, OID_VTP_TRUNK + '.' + ifidx)
+				link_type = snmpobj.cache_lookup(node.link_type_vbtbl, OID_VTP_TRUNK + '.' + ifidx)
 
 				# get LAG membership
-				lag = snmpobj.cache_lookup(lag_vbtbl, OID_LAG_LACP + '.' + ifidx)
-				lag = get_ifname(snmpobj, ifname_vbtbl, lag)
+				lag = snmpobj.cache_lookup(node.lag_vbtbl, OID_LAG_LACP + '.' + ifidx)
+				lag = get_ifname(snmpobj, node.ifname_vbtbl, lag)
 
 				# get VLAN info
-				vlan = snmpobj.cache_lookup(vlan_vbtbl, OID_IF_VLAN + '.' + ifidx)
+				vlan = snmpobj.cache_lookup(node.vlan_vbtbl, OID_IF_VLAN + '.' + ifidx)
 
 				# get IP address
-				lifip = get_ip_from_ifidx(snmpobj, ifip_vbtbl, ifidx)
+				lifip = get_ip_from_ifidx(snmpobj, node.ifip_vbtbl, ifidx)
 
 				# get the child info
 				if ((self.is_node_allowed(rip) == 1) & (rip != 'UNKNOWN')):
@@ -356,6 +385,11 @@ class mnet_graph:
 		print('  VSS Mode: %i' % node.vss_enable)
 		print('VSS Domain: %s' % node.vss_domain)
 
+		print('      SVIs:')
+		for svi in node.svis:
+			for ip in svi.ip:
+				print('     SVI(%s) IP: %s' % (svi.vlan, ip))
+				
 		print('     Links:')
 		for link in node.links:
 			print('       %s -> %s:%s' % (link.local_port, link.node.name, link.remote_port))
@@ -413,6 +447,11 @@ class mnet_graph:
 			if (node.hsrp_pri != None):
 				node_label += '<br />HSRP VIP %s' \
 								'<br />HSRP Pri %s' % (node.hsrp_vip, node.hsrp_pri)
+
+		if (self.config.graph.include_svi == True):
+			for svi in node.svis:
+				for ip in svi.ip:
+					node_label += '<br />VLAN %s - %s' % (svi.vlan, ip)
 
 		graph.add_node(
 				pydot.Node(
