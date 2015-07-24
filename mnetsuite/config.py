@@ -29,7 +29,10 @@ import json
 class mnet_config_graph:
 	node_text_size = 8
 	link_text_size = 7
+	title_text_size = 15 
 	include_svi	= False
+	include_lo = False
+	get_stack_members = False
 
 class mnet_config:
 	host_domains	= []
@@ -56,7 +59,10 @@ class mnet_config:
 		if (json_graph != None):
 			self.graph.node_text_size = json_graph.get('node_text_size', 8)
 			self.graph.link_text_size = json_graph.get('link_text_size', 7)
+			self.graph.title_text_size = json_graph.get('title_text_size', 15)
 			self.graph.include_svi = json_graph.get('include_svi', False)
+			self.graph.include_lo = json_graph.get('include_lo', False)
+			self.graph.get_stack_members = json_graph.get('get_stack_members', False)
 
 		return 1
 
@@ -91,7 +97,11 @@ class mnet_config:
 				'	],\n' \
 				'	"graph" : {\n' \
 				'		"node_text_size" : 10,\n' \
-				'		"link_text_size" : 9\n' \
+				'		"link_text_size" : 9,\n' \
+				'		"title_text_size" : 15,\n' \
+				'		"include_svi" : 0,\n' \
+				'		"include_lo" : 0,\n' \
+				'		"get_stack_members" : 1\n' \
 				'	}\n' \
 				'}'
 

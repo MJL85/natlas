@@ -37,25 +37,6 @@ from config import mnet_config
 if (USE_NETADDR == 1):
 	from netaddr import IPAddress, IPNetwork
 
-#
-# Get the platform type for this IP.
-#
-def get_sys_platform(snmpobj):
-	oids = [
-			OID_PLATFORM1,
-			OID_PLATFORM2,
-			OID_PLATFORM3,
-			OID_PLATFORM4
-	]
-
-	for oid in oids:
-		p = snmpobj.get_val(oid)
-
-		if ((p != None) & (p != '') & (p != 'Port Container') & (p != OID_ERR)):
-			return p
-	
-	return 'UNKNOWN'
-
 
 #
 # Lookup and format an interface name from a cache table of indexes.
@@ -109,27 +90,6 @@ def get_net_bits_from_mask(netm):
 			v = v >> 1
 
 	return cidr
-
-
-#
-# Return the number of devices in the StackWise cluster, if any.
-#
-def get_stackwise_count(snmpobj):
-	varBindTable = snmpobj.get_bulk(OID_STACK_IMG)
-	if (varBindTable == None):
-		return 0
-
-	c = 0
-
-	for varBindTableRow in varBindTable:
-		for name, val in varBindTableRow:
-			c = c + 1
-
-	# 3750x's stack by default, even if there's only 1
-	if (c == 1):
-		return 0
-
-	return c
 
 
 #

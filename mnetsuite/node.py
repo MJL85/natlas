@@ -24,6 +24,8 @@
 	Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 '''
 
+from snmp import *
+
 class mnet_node_link:
 	node			= None
 	link_type		= None
@@ -67,13 +69,105 @@ class mnet_node_svi:
 		self.ip = []
 
 
+class mnet_node_lo:
+	name = None
+	ip = None
+
+	def __init__(self, name, ip):
+		self.name = name.replace('Loopback', 'lo')
+		self.ip = ip
+
+
+class mnet_node_stack_member:
+	num = 0
+	role = 0
+	pri = 0
+	mac = None
+	img = None
+	serial = None
+
+	def __init__(self):
+		self.num = 0
+		self.role = 0
+		self.pri = 0
+		self.mac = None
+		self.img = None
+		self.serial = None
+
+
+class mnet_node_stack:
+	members = []
+	count = 0
+
+	def __init__(self, snmpobj = None, get_details = 0):
+		self.members = []
+		self.count = 0
+
+		if (snmpobj != None):
+			self.get_members(snmpobj, get_details)
+
+	def get_members(self, snmpobj, get_details):
+		vbtbl = snmpobj.get_bulk(OID_STACK)
+		if (vbtbl == None):
+			return None
+
+		if (get_details == 0):
+			self.count = 0
+			for row in vbtbl:
+				for n, v in row:
+					if (n.prettyPrint().startswith(OID_STACK_NUM + '.')):
+						self.count += 1
+
+			if (self.count == 1):
+				self.count = 0
+			return				
+
+		serial_vbtbl = snmpobj.get_bulk(OID_3750X_SERIAL)
+
+		for row in vbtbl:
+			for n, v in row:
+				if (n.prettyPrint().startswith(OID_STACK_NUM + '.')):
+					m = mnet_node_stack_member()
+
+					t = n.prettyPrint().split('.')
+					idx = t[14]
+
+					m.num  = v
+					m.role = snmpobj.cache_lookup(vbtbl, OID_STACK_ROLE + '.' + idx)
+					m.pri  = snmpobj.cache_lookup(vbtbl, OID_STACK_PRI + '.' + idx)
+					m.mac  = snmpobj.cache_lookup(vbtbl, OID_STACK_MAC + '.' + idx)
+					m.img  = snmpobj.cache_lookup(vbtbl, OID_STACK_IMG + '.' + idx)
+
+					m.serial = snmpobj.cache_lookup(serial_vbtbl, OID_3750X_SERIAL + '.' + idx)
+
+					if (m.role == '1'):
+						m.role = 'master'
+					elif (m.role == '2'):
+						m.role = 'member'
+					elif (m.role == '3'):
+						m.role = 'notMember'
+					elif (m.role == '4'):
+						m.role = 'standby'
+
+					mac_seg = [m.mac[x:x+4] for x in xrange(2, len(m.mac), 4)]
+					m.mac = '.'.join(mac_seg)
+
+					self.members.append(m)
+
+		self.count = len(self.members)
+		if (self.count == 1):
+			self.count = 0
+
+		return
+
+
 class mnet_node:
 	snmp_cred = None
 	crawled = 0
 	links = []
 
 	name			= None
-	ip				= None
+	ip				= []
 	plat			= None
 	ios				= None
 	router			= None
@@ -81,11 +175,12 @@ class mnet_node:
 	bgp_las			= None
 	hsrp_pri		= None
 	hsrp_vip		= None
-	stack_count		= 0
 	vss_enable		= 0
 	vss_domain		= None
 
 	svis			= []
+	loopbacks		= []
+	stack			= None
 
 	# cached MIB trees
 	link_type_vbtbl	= None
@@ -93,6 +188,7 @@ class mnet_node:
 	vlan_vbtbl		= None
 	ifname_vbtbl	= None
 	ifip_vbtbl		= None
+	ethif_vbtbl		= None
 
 	def __init__(
 				self,
@@ -105,9 +201,9 @@ class mnet_node:
 				bgp_las			= None,
 				hsrp_pri		= None,
 				hsrp_vip		= None,
-				stack_count		= 0,
 				vss_enable		= 0,
-				vss_domain		= None
+				vss_domain		= None,
+				stack			= None
 			):
 		self.snmp_cred			= None
 		self.links				= []
@@ -122,11 +218,22 @@ class mnet_node:
 		self.bgp_las			= bgp_las
 		self.hsrp_pri			= hsrp_pri
 		self.hsrp_vip			= hsrp_vip
-		self.stack_count		= stack_count
 		self.vss_enable			= vss_enable
 		self.vss_domain			= vss_domain
 
 		self.svis = []
+		self.loopbacks = []
+
+		self.stack				= stack
+		if (self.stack == None):
+			self.stack = mnet_node_stack()
+
+		link_type_vbtbl	= None
+		lag_vbtbl		= None
+		vlan_vbtbl		= None
+		ifname_vbtbl	= None
+		ifip_vbtbl		= None
+		ethif_vbtbl		= None
 
 	def add_link(self, link):
 		self.links.append(link)
