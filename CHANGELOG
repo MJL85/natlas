@@ -9,6 +9,10 @@ CHANGE LOG
 v0.7 -
 	graph
 	- Added config option "include_svi" to include SVI info for nodes
+	- Added config option "include_lo" to include loopback info for nodes
+	- Added config option "get_stack_members" to include additional stack member info (serials, mac's etc).
+		This info is also included in the catalog option, with each stack member being a line item.
+	- Removed SNMP platform detection and now use CDP. This means a low depth may not get the root platform.
 
 v0.6 - 7/19/2015
 	graph

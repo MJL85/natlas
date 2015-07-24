@@ -34,7 +34,7 @@ import binascii
 from snmp import *
 from config import mnet_config
 from util import *
-from node import mnet_node, mnet_node_link, mnet_node_svi
+from node import *
 from _version import __version__
 
 
@@ -76,37 +76,49 @@ class mnet_graph:
 		# return a minimal node since we don't have
 		# a real IP.
 		if (ip == '0.0.0.0'):
-			d = mnet_node(name = 'UNKNOWN', ip = ip)
+			d = mnet_node(name = 'UNKNOWN', ip = [ip])
 			self.nodes.append(d)
 			return d
+
+		# see if we know about this node by its IP first.
+		# this would save us an SNMP query for the hostname.
+		for ex in self.nodes:
+			for exip in ex.ip:
+				if (exip == ip):
+					return ex
 
 		snmpobj = mnet_snmp(ip)
 
 		# find valid credentials for this node
 		if (snmpobj.get_cred(self.config.snmp_creds) == 0):
-			sys.stdout.write('?')
+			sys.stdout.write('+')
 			for i in range(0, depth):
 				sys.stdout.write('.')
 			print('UNKNOWN (%s)            << UNABLE TO CONNECT WITH SNMP' % ip)
-			d = mnet_node(name = 'UNKNOWN',	ip = ip)
+			d = mnet_node(name = 'UNKNOWN',	ip = [ip])
 			self.nodes.append(d)
 			return d
 
 		system_name = shorten_host_name(snmpobj.get_val(OID_SYSNAME), self.config.host_domains)
 
-		# verify this node isn't already in our visited list
+		# verify this node isn't already in our visited
+		# list by checking for its hostname
 		for ex in self.nodes:
 			if (ex.name == system_name):
+				for exip in ex.ip:
+					if (exip == ip):
+						return ex
+				ex.ip.append(ip)
 				return ex
 
 		# print some info to stdout
-		sys.stdout.write('?')
+		sys.stdout.write('+')
 		for i in range(0, depth):
 			sys.stdout.write('.')
 		print('%s (%s)' % (system_name, ip))
 
 		# collect general information about this node
-		stack_count = get_stackwise_count(snmpobj)
+		stack = mnet_node_stack(snmpobj, self.config.graph.get_stack_members)
 		vss_enable = 1 if (snmpobj.get_val(OID_VSS_MODE) == '2') else 0
 		vss_domain = None
 
@@ -135,16 +147,16 @@ class mnet_graph:
 		# save this node
 		d = mnet_node(
 				name			= system_name,
-				ip				= ip,
-				plat			= get_sys_platform(snmpobj),
+				ip				= [ip],
+				plat			= None,
 				router			= router,
 				ospf_id			= ospf or None,
 				bgp_las			= bgp or None,
 				hsrp_pri		= hsrp_pri or None,
 				hsrp_vip		= hsrp_vip or None,
-				stack_count		= stack_count,
 				vss_enable		= vss_enable,
-				vss_domain		= vss_domain
+				vss_domain		= vss_domain,
+				stack			= stack
 			)
 		d.snmp_cred = snmpobj._cred
 		self.nodes.append(d)
@@ -171,6 +183,22 @@ class mnet_graph:
 
 					d.svis.append(svi)
 
+		# Pull loopback info if needed
+		if (self.config.graph.include_lo == True):
+			d.ethif_vbtbl = snmpobj.get_bulk(OID_ETH_IF)
+
+			if (d.ifip_vbtbl == None):
+				d.ifip_vbtbl = snmpobj.get_bulk(OID_IF_IP)
+			
+			for row in d.ethif_vbtbl:
+				for n, v in row:
+					if (n.prettyPrint().startswith(OID_ETH_IF_TYPE) & (v == 24)):
+						ifidx = n.prettyPrint().split('.')[10]
+						lo_name = snmpobj.cache_lookup(d.ethif_vbtbl, OID_ETH_IF_DESC + '.' + ifidx)
+						lo_ip = get_ip_from_ifidx(snmpobj, d.ifip_vbtbl, ifidx)
+						lo = mnet_node_lo(lo_name, lo_ip) 
+						d.loopbacks.append(lo)
+
 		return d
 
 
@@ -192,7 +220,7 @@ class mnet_graph:
 		# vmware ESX can report IP as 0.0.0.0
 		# If we are allowing 0.0.0.0/32 in the config,
 		# then we added it as a leaf, but don't crawl it
-		if (node.ip == '0.0.0.0'):
+		if (node.ip[0] == '0.0.0.0'):
 			return
 
 		# may be a leaf we couldn't connect to previously
@@ -203,10 +231,10 @@ class mnet_graph:
 		sys.stdout.write('>')
 		for i in range(0, depth):
 			sys.stdout.write('.')
-		print('%s (%s)' % (node.name, node.ip))
+		print('%s (%s)' % (node.name, node.ip[0]))
 
 		# get the cached snmp credentials
-		snmpobj = mnet_snmp(node.ip)
+		snmpobj = mnet_snmp(node.ip[0])
 		snmpobj._cred = node.snmp_cred
 
 		children = []
@@ -284,7 +312,7 @@ class mnet_graph:
 						if (child.snmp_cred == None):
 							child.name = shorten_host_name(val.prettyPrint(), self.config.host_domains)
 
-						# always prefer CDP advertised platform over what we pulled from SNMP
+						# CDP advertises the platform
 						child.plat = rplat.replace('cisco ', '')
 						child.ios = rios
 
@@ -373,7 +401,7 @@ class mnet_graph:
 
 		print('-----------------------------------------')
 		print('      Name: %s' % node.name)
-		print('        IP: %s' % node.ip)
+		print('        IP: %s' % node.ip[0])
 		print('  Platform: %s' % node.plat)
 		print('   IOS Ver: %s' % node.ios)
 		print('   Routing: %s' % ('yes' if (node.router == 1) else 'no'))
@@ -381,15 +409,35 @@ class mnet_graph:
 		print('   BGP LAS: %s' % node.bgp_las)
 		print('  HSRP Pri: %s' % node.hsrp_pri)
 		print('  HSRP VIP: %s' % node.hsrp_vip)
-		print(' Stack Cnt: %i' % node.stack_count)
 		print('  VSS Mode: %i' % node.vss_enable)
 		print('VSS Domain: %s' % node.vss_domain)
+		print(' Stack Cnt: %i' % node.stack.count)
+		
+		if ((node.stack.count > 0) & (self.config.graph.get_stack_members)):
+			print('      Stack members:')
+			for smem in node.stack.members:
+				print('        Switch Number: %s' % (smem.num))
+				print('                 Role: %s' % (smem.role))
+				print('             Priority: %s' % (smem.pri))
+				print('                  MAC: %s' % (smem.mac))
+				print('                Image: %s' % (smem.img))
+				print('               Serial: %s' % (smem.serial))
 
-		print('      SVIs:')
-		for svi in node.svis:
-			for ip in svi.ip:
-				print('     SVI(%s) IP: %s' % (svi.vlan, ip))
+		print('      Loopbacks:')
+		if (self.config.graph.include_lo == False):
+			print('        Not configured.')
+		else:
+			for lo in node.loopbacks:
+				print('        %s - %s' % (lo.name, lo.ip))
 				
+		print('      SVIs:')
+		if (self.config.graph.include_svi == False):
+			print('        Not configured.')
+		else:
+			for svi in node.svis:
+				for ip in svi.ip:
+					print('        SVI %s - %s' % (svi.vlan, ip))
+
 		print('     Links:')
 		for link in node.links:
 			print('       %s -> %s:%s' % (link.local_port, link.node.name, link.remote_port))
@@ -425,7 +473,7 @@ class mnet_graph:
 		node_label = '<font point-size="10"><b>%s</b></font><br />' \
 						'<font point-size="8"><i>%s</i></font><br />' \
 						'%s<br />%s' \
-						% (node.name, node.ip, node.plat, node.ios)
+						% (node.name, node.ip[0], node.plat, node.ios)
 		node_style = 'solid'
 		node_shape = 'ellipse'
 		node_peripheries = 1
@@ -434,9 +482,13 @@ class mnet_graph:
 			node_label += '<br />VSS %s' % node.vss_domain
 			node_peripheries = 2
 
-		if (node.stack_count > 0):
-			node_label += '<br />Stackwise %i' % node.stack_count
-			node_peripheries = node.stack_count
+		if (node.stack.count > 0):
+			node_label += '<br />Stackwise %i' % node.stack.count
+			node_peripheries = node.stack.count
+
+			if (self.config.graph.get_stack_members):
+				for smem in node.stack.members:
+					node_label += '<br />Switch %s - %s (%s)' % (smem.num, smem.serial, smem.role)
 
 		if (node.router == 1):
 			node_shape = 'diamond'
@@ -447,6 +499,10 @@ class mnet_graph:
 			if (node.hsrp_pri != None):
 				node_label += '<br />HSRP VIP %s' \
 								'<br />HSRP Pri %s' % (node.hsrp_vip, node.hsrp_pri)
+
+		if (self.config.graph.include_lo == True):
+			for lo in node.loopbacks:
+				node_label += '<br />%s - %s' % (lo.name, lo.ip)
 
 		if (self.config.graph.include_svi == True):
 			for svi in node.svis:
@@ -509,17 +565,18 @@ class mnet_graph:
 	def output_dot(self, dot_file, title):
 		self._reset_crawled()
 
+		title_text_size = self.config.graph.title_text_size
 		credits = '<table border="0">' \
 					'<tr>' \
 					 '<td balign="right">' \
-					  '<font point-size="15"><b>$title$</b></font><br />' \
-					  '<font point-size="9">$date$</font><br />' \
+					  '<font point-size="%i"><b>$title$</b></font><br />' \
+					  '<font point-size="%i">$date$</font><br />' \
 					  '<font point-size="7">' \
 					  'Generated by MNet Suite $ver$<br />' \
 					  'Written by Michael Laforest</font><br />' \
 					 '</td>' \
 					'</tr>' \
-				   '</table>'
+				   '</table>' % (title_text_size, title_text_size-2)
 
 		today = datetime.datetime.now()
 		today = today.strftime('%Y-%m-%d %H:%M')
@@ -571,14 +628,24 @@ class mnet_graph:
 			serial = ''
 			bootf = ''
 			
-			if (n.ip):
-				snmpobj = mnet_snmp(n.ip)
-				snmpobj.get_cred(self.config.snmp_creds)
+			if (n.ip[0]):
+				snmpobj = mnet_snmp(n.ip[0])
+				snmpobj._cred = n.snmp_cred
 
-				serial = snmpobj.get_val(OID_SYS_SERIAL)
-				bootf  = snmpobj.get_val(OID_SYS_BOOT)
+				if (snmpobj._cred != None):
+					bootf  = snmpobj.get_val(OID_SYS_BOOT)
 
-			f.write('"%s","%s","%s","%s","%s"\n' % (n.name, n.ip, n.plat, n.ios, serial, bootf))
+			if (n.stack.count == 0):
+				if (snmpobj._cred != None):
+					serial = snmpobj.get_val(OID_SYS_SERIAL)
+
+				f.write('"%s","%s","%s","%s","%s","%s"\n' % (n.name, n.ip[0], n.plat, n.ios, serial, bootf))
+			else:
+				for smem in n.stack.members:
+					if (snmpobj._cred != None):
+						serial = smem.serial or 'NOT CONFIGURED TO POLL'
+						
+					f.write('"%s","%s","?%s","%s","%s","%s"\n' % (n.name, n.ip[0], n.plat, n.ios, serial, bootf))
 
 		f.close()
 

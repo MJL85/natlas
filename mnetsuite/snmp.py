@@ -28,12 +28,9 @@ from pysnmp.entity.rfc3413.oneliner import cmdgen
 
 SNMP_PORT = 161
 
-OID_PLATFORM1	= '1.3.6.1.2.1.47.1.1.1.1.2.1001'
-OID_PLATFORM2	= '1.3.6.1.4.1.9.9.92.1.1.1.13.1'		# AIR-CAP1702
-OID_PLATFORM3	= '1.3.6.1.4.1.9.9.249.1.1.1.1.3.1000'	# C4500
-OID_PLATFORM4	= '1.3.6.1.2.1.47.1.1.1.1.2'			# Nexus
-
 OID_SYSNAME		= '1.3.6.1.2.1.1.5.0'
+
+OID_3750X_SERIAL = '1.3.6.1.2.1.47.1.1.1.1.11'
 
 OID_SYS_SERIAL	= '1.3.6.1.4.1.9.3.6.3.0'
 OID_SYS_BOOT	= '1.3.6.1.4.1.9.2.1.73.0'
@@ -60,6 +57,10 @@ OID_IF_IP_NETM	= '1.3.6.1.2.1.4.20.1.3.'				# + a.b.c.d
 
 OID_SVI_VLANIF	= '1.3.6.1.4.1.9.9.128.1.1.1.1.3'		# cviRoutedVlanIfIndex
 
+OID_ETH_IF		= '1.3.6.1.2.1.2.2.1'					# ifEntry
+OID_ETH_IF_TYPE	= '1.3.6.1.2.1.2.2.1.3'					# ifEntry.ifType	24=loopback
+OID_ETH_IF_DESC	= '1.3.6.1.2.1.2.2.1.2'					# ifEntry.ifDescr
+
 OID_OSPF		= '1.3.6.1.2.1.14.1.2.0'
 OID_OSPF_ID		= '1.3.6.1.2.1.14.1.1.0'
 
@@ -68,7 +69,14 @@ OID_BGP_LAS		= '1.3.6.1.2.1.15.2.0'
 OID_HSRP_PRI	= '1.3.6.1.4.1.9.9.106.1.2.1.1.3.1.10'
 OID_HSRP_VIP	= '1.3.6.1.4.1.9.9.106.1.2.1.1.11.1.10'
 
-OID_STACK_IMG	= '1.3.6.1.4.1.9.9.500.1.2.1.1.1'		# (BULK)
+OID_STACK		= '1.3.6.1.4.1.9.9.500'
+OID_STACK_NUM	= '1.3.6.1.4.1.9.9.500.1.2.1.1.1'
+OID_STACK_ROLE	= '1.3.6.1.4.1.9.9.500.1.2.1.1.3'
+OID_STACK_PRI	= '1.3.6.1.4.1.9.9.500.1.2.1.1.4'
+OID_STACK_MAC	= '1.3.6.1.4.1.9.9.500.1.2.1.1.7'
+OID_STACK_IMG	= '1.3.6.1.4.1.9.9.500.1.2.1.1.8'
+
+
 OID_VSS_MODE	= '1.3.6.1.4.1.9.9.388.1.1.4.0'
 OID_VSS_DOMAIN	= '1.3.6.1.4.1.9.9.388.1.1.1.0'
 
