@@ -167,3 +167,14 @@ def convert_ip_int_str(iip):
 
 	return 'UNKNOWN'
 
+
+def get_module_from_interf(port):
+	try:
+		s = re.search('[^\d]*(\d*)/\d*/\d*', port)
+		if (s):
+			return s.group(1)
+	except:
+		pass
+
+	return '1'
+
