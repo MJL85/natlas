@@ -92,10 +92,19 @@ The toolset uses a JSON configuration file for common parameters.
 	"subnets" : [
 		"10.0.0.0/8"
 	],
-	"graph" : {
+ 	"graph" : {
 		"node_text_size" : 10,
-		"link_text_size" : 9
-	}
+		"link_text_size" : 9,
+		"title_text_size" : 15,
+		"include_svi" : 0,
+		"include_lo" : 0,
+		"include_serials": 0,
+		"get_stack_members" : 0,
+		"get_vss_members" : 0,
+		"collapse_stackwise" : 1,
+		"collapse_vss" : 1
+        }
+	
 }
 ```
 
@@ -105,7 +114,22 @@ The toolset uses a JSON configuration file for common parameters.
 | `domains` | Defines a list of domains that should be stripped off of the device names.  For example, if a switch is found with the name *SW1.company.com*, the above example will only show *SW1* in the output. |
 | `subnets` | Defines a list of nodes that should be allowed to be discovered during the discovery process. If a node is discovered as being a neighbor to a node currently being crawled, the neighbor will only be crawled if it is in one of the CIDR ranges defined here. Therefore this list defines the subnets that are allowed to be included in the discovery process, but does not itself define the range of devices to be discovered (i.e. mnet will not do a sweep across all IP addresses in the defined subnets). |
 | `exclude` | Defines a list of nodes that should be skipped entirely during the discovery process. Since the node is skipped nothing beyond it will be discovered. |
-| `graph` | Defines specific values used to change graph attributes.  `node_text_size` and `link_text_size` are supported and are both integers. |
+| `graph` | Defines specific values used to change graph attributes.  Detailed below in the *Graph block* table. |
+
+**Graph block**
+
+| Variable | Type | Default Value | Description |
+| --- | --- | --- | --- |
+| `node_text_size` | integer | `10` | Node text size. |
+| `link_text_size` | integer | `9` | Link text size. |
+| `title_text_size` | integer | `15` |  Graph title text size. |
+| `include_svi` | bool | `0` | If set to `1`, nodes will include SVI information. |
+| `include_lo` | bool | `0` | If set to `1`, nodes will include loopback interface information. |
+| `include_serials` | bool | `0` | If set to `1`, nodes will include serial numbers. |
+| `get_stack_members` | bool | `0` | If set to `1`, nodes will include details about stackwise members. |
+| `get_vss_members` | bool | `0` | If set to `1`, nodes will include details about VSS members. |
+| `collapse_stackwise` | bool | `1` | If set to `0`, nodes belonging to stackwise groups will be expanded to show each member as a node. |
+| `collapse_vss` | bool | `1` | If set to `0`, nodes belonging to VSS groups will be expanded to show each member as a node. |
 
 # MNet's Graph Module
 
@@ -136,6 +160,7 @@ MNet's Graph module attempts to include all of the above information in the diag
   + If a node has multiple borders then either VSS or StackWise is enabled.
     + VSS - Will always have a double border.
     + StackWise - The number of borders denotes the number of switches in the stack.
+  + If the configuration specifies, VSS and Stackwise nodes will be grouped in larger squares.
 + Links
   + Links are shown with arrowed lines.  The end with no arrow is the *parent* and the end with the arrow is the *child*, such that the arrangement is *parent*->*child*.
   + If a link says *P:gi0/1* , *C:gi1/4* then the parent node's connection is on port gi0/1 and the child node's connection is on port gi1/4.
