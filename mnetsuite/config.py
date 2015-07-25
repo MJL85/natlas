@@ -109,7 +109,9 @@ class mnet_config:
 				'		"title_text_size" : 15,\n' \
 				'		"include_svi" : 0,\n' \
 				'		"include_lo" : 0,\n' \
-				'		"get_stack_members" : 1\n' \
+				'		"include_serials" : 0,\n' \
+				'		"get_stack_members" : 0,\n' \
+				'		"get_vss_members" : 0\n' \
 				'	}\n' \
 				'}'
 
