@@ -38,6 +38,22 @@ from node import *
 from _version import __version__
 
 
+class mnet_graph_dot_node:
+	ntype = None
+	shape = None
+	style = None
+	peripheries = 0
+	label = None
+
+	def __init__(self):
+		self.ntype = 'single'
+		self.shape = 'ellipse'
+		self.style = 'solid'
+		self.peripheries = 1
+		self.label = ''
+		self.vss_label = ''
+
+
 class mnet_graph:
 	root_node = None
 
@@ -480,6 +496,81 @@ class mnet_graph:
 		print('Discovered links:   %i' % num_links)
 
 
+	def _output_dot_get_node(self, graph, node):
+		dot_node = mnet_graph_dot_node()
+		dot_node.ntype = 'single'
+		dot_node.shape = 'ellipse'
+		dot_node.style = 'solid'
+		dot_node.peripheries = 1
+		dot_node.label = ''
+
+		dot_node.label = '<font point-size="10"><b>%s</b></font><br />' \
+						'<font point-size="8"><i>%s</i></font>' \
+						% (node.name, node.ip[0])
+
+		if ((node.stack.count == 0) | (self.config.graph.get_stack_members == 0)):
+			# show platform here or break it down by stack/vss later
+			dot_node.label += '<br />%s' % node.plat
+
+		if ((self.config.graph.include_serials == 1) & (node.stack.count == 0) & (node.vss.enabled == 0)):
+			dot_node.label += '<br />%s' % node.serial
+
+		dot_node.label += '<br />%s' % node.ios
+		
+		if (node.vss.enabled == 1):
+			if (self.config.graph.collapse_vss == 0):
+				dot_node.ntype = 'vss'
+			else:
+				# group VSS into one graph node
+				dot_node.peripheries = 2
+				s1 = ''
+				s2 = ''
+				if (self.config.graph.include_serials == 1):
+					s1 = ' - %s' % node.vss.members[0].serial
+					s2 = ' - %s' % node.vss.members[1].serial
+
+				dot_node.label += '<br />VSS %s' % node.vss.domain
+				dot_node.label += '<br />VSS 0 - %s%s' % (node.vss.members[0].plat, s1)
+				dot_node.label += '<br />VSS 1 - %s%s' % (node.vss.members[1].plat, s2)
+
+		if (node.stack.count > 0):
+			if (self.config.graph.collapse_stackwise == 0):
+				dot_node.ntype = 'stackwise'
+			else:
+				# group Stackwise into one graph node
+				dot_node.peripheries = node.stack.count
+
+				dot_node.label += '<br />Stackwise %i' % node.stack.count
+
+				if (self.config.graph.get_stack_members):
+					for smem in node.stack.members:
+						serial = ''
+						if (self.config.graph.include_serials == 1):
+							serial = ' - %s' % smem.serial
+						dot_node.label += '<br />SW %s - %s%s (%s)' % (smem.num, smem.plat, serial, smem.role)
+
+		if (node.router == 1):
+			dot_node.shape = 'diamond'
+			if (node.bgp_las != None):
+				dot_node.label += '<br />BGP %s' % node.bgp_las
+			if (node.ospf_id != None):
+				dot_node.label += '<br />OSPF %s' % node.ospf_id
+			if (node.hsrp_pri != None):
+				dot_node.label += '<br />HSRP VIP %s' \
+								'<br />HSRP Pri %s' % (node.hsrp_vip, node.hsrp_pri)
+
+		if (self.config.graph.include_lo == True):
+			for lo in node.loopbacks:
+				dot_node.label += '<br />%s - %s' % (lo.name, lo.ip)
+
+		if (self.config.graph.include_svi == True):
+			for svi in node.svis:
+				for ip in svi.ip:
+					dot_node.label += '<br />VLAN %s - %s' % (svi.vlan, ip)
+
+		return dot_node
+
+
 	def _output_dot(self, graph, node):
 		if (node == None):
 			return (0, 0)
@@ -487,74 +578,73 @@ class mnet_graph:
 			return (0, 0)
 		node.crawled = 1
 
-		node_label = '<font point-size="10"><b>%s</b></font><br />' \
-						'<font point-size="8"><i>%s</i></font>' \
-						% (node.name, node.ip[0])
+		dot_node = self._output_dot_get_node(graph, node)
 
-		if (((node.stack.count == 0) | (self.config.graph.get_stack_members == 0)) & (node.vss.enabled == 0)):
-			# show platform here or break it down by stack/vss later
-			node_label += '<br />%s' % node.plat
+		if (dot_node.ntype == 'single'):
+			graph.add_node(
+					pydot.Node(
+						name = node.name,
+						label = '<%s>' % dot_node.label,
+						style = dot_node.style,
+						shape = dot_node.shape,
+						peripheries = dot_node.peripheries
+					)
+			)
+		elif (dot_node.ntype == 'vss'):
+			cluster = pydot.Cluster(
+							graph_name = node.name,
+							suppress_disconnected = False,
+							labelloc = 't',
+							labeljust = 'c',
+							fontsize = self.config.graph.node_text_size,
+							label = '<<br /><b>VSS %s</b>>' % node.vss.domain
+						)
+			for i in range(0, 2):
+				serial = ''
+				if (self.config.graph.include_serials == 1):
+					serial = ' - %s' % node.vss.members[i].serial
+				
+				vss_label = 'VSS %i - %s%s' % (i, node.vss.members[i].plat, serial)
 
-		if ((self.config.graph.include_serials == 1) & (node.stack.count == 0) & (node.vss.enabled == 0)):
-			node_label += '<br />%s' % node.serial
-
-		node_label += '<br />%s' % node.ios
-		
-		node_style = 'solid'
-		node_shape = 'ellipse'
-		node_peripheries = 1
-
-		if (node.vss.enabled == 1):
-			s1 = ''
-			s2 = ''
-			if (self.config.graph.include_serials == 1):
-				s1 = ' - %s' % node.vss.members[0].serial
-				s2 = ' - %s' % node.vss.members[1].serial
-
-			node_label += '<br />VSS %s' % node.vss.domain
-			node_label += '<br />VSS 0 - %s%s' % (node.vss.members[0].plat, s1)
-			node_label += '<br />VSS 1 - %s%s' % (node.vss.members[1].plat, s2)
-			node_peripheries = 2
-
-		if (node.stack.count > 0):
-			node_label += '<br />Stackwise %i' % node.stack.count
-			node_peripheries = node.stack.count
-
-			if (self.config.graph.get_stack_members):
-				for smem in node.stack.members:
-					serial = ''
-					if (self.config.graph.include_serials == 1):
-						serial = ' - %s' % smem.serial
-					node_label += '<br />SW %s - %s%s (%s)' % (smem.num, smem.plat, serial, smem.role)
-
-		if (node.router == 1):
-			node_shape = 'diamond'
-			if (node.bgp_las != None):
-				node_label += '<br />BGP %s' % node.bgp_las
-			if (node.ospf_id != None):
-				node_label += '<br />OSPF %s' % node.ospf_id
-			if (node.hsrp_pri != None):
-				node_label += '<br />HSRP VIP %s' \
-								'<br />HSRP Pri %s' % (node.hsrp_vip, node.hsrp_pri)
-
-		if (self.config.graph.include_lo == True):
-			for lo in node.loopbacks:
-				node_label += '<br />%s - %s' % (lo.name, lo.ip)
-
-		if (self.config.graph.include_svi == True):
-			for svi in node.svis:
-				for ip in svi.ip:
-					node_label += '<br />VLAN %s - %s' % (svi.vlan, ip)
-
-		graph.add_node(
-				pydot.Node(
-					name = node.name,
-					label = '<%s>' % node_label,
-					style = node_style,
-					shape = node_shape,
-					peripheries = node_peripheries
+				cluster.add_node(
+						pydot.Node(
+							name = '%s[mnetVSS%i]' % (node.name, i+1),
+							label = '<%s<br />%s>' % (dot_node.label, vss_label),
+							style = dot_node.style,
+							shape = dot_node.shape,
+							peripheries = dot_node.peripheries
+						)
 				)
-		)
+			graph.add_subgraph(cluster)
+		elif (dot_node.ntype == 'stackwise'):
+			cluster = pydot.Cluster(
+							graph_name = node.name,
+							suppress_disconnected = False,
+							labelloc = 't',
+							labeljust = 'c',
+							fontsize = self.config.graph.node_text_size,
+							label = '<<br /><b>Stackwise</b>>'
+						)
+			for i in range(0, node.stack.count):
+				serial = ''
+				if (self.config.graph.include_serials == 1):
+					serial = ' - %s' % node.stack.members[i].serial
+				
+				smem = node.stack.members[i]
+				sw_label = 'SW %i (%s)<br />%s%s' % (i, smem.role, smem.plat, serial)
+
+				cluster.add_node(
+						pydot.Node(
+							name = '%s[mnetSW%i]' % (node.name, i+1),
+							label = '<%s<br />%s>' % (dot_node.label, sw_label),
+							style = dot_node.style,
+							shape = dot_node.shape,
+							peripheries = dot_node.peripheries
+						)
+				)
+			graph.add_subgraph(cluster)
+
+
 
 		for link in node.links:
 			self._output_dot(graph, link.node)
@@ -587,15 +677,32 @@ class mnet_graph:
 				if (link.vlan != None):
 					link_label += '\nVLAN %s' % link.vlan
 
-			graph.add_edge(
-					pydot.Edge(
-						node.name, link.node.name,
+			edge_src = node.name
+			edge_dst = link.node.name
+			lmod = get_module_from_interf(link.local_port)
+			rmod = get_module_from_interf(link.remote_port)
+
+			if (self.config.graph.collapse_vss == 0):
+				if (node.vss.enabled == 1):
+					edge_src = '%s[mnetVSS%s]' % (node.name, lmod)
+				if (link.node.vss.enabled == 1):
+					edge_dst = '%s[mnetVSS%s]' % (link.node.name, rmod)
+
+			if (self.config.graph.collapse_stackwise == 0):
+				if (node.stack.count > 0):
+					edge_src = '%s[mnetSW%s]' % (node.name, lmod)
+				if (link.node.stack.count > 0):
+					edge_dst = '%s[mnetSW%s]' % (link.node.name, rmod)
+
+			edge = pydot.Edge(
+						edge_src, edge_dst,
 						dir = 'forward',
 						label = link_label,
 						color = link_color,
 						style = link_style
 					)
-			)
+
+			graph.add_edge(edge)
 
 
 

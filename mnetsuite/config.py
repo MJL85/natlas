@@ -35,6 +35,8 @@ class mnet_config_graph:
 	include_serials = False
 	get_stack_members = False
 	get_vss_members = False
+	collapse_stackwise = True
+	collapse_vss = True
 
 class mnet_config:
 	host_domains	= []
@@ -63,14 +65,16 @@ class mnet_config:
 
 		json_graph = json_data.get('graph', None)
 		if (json_graph != None):
-			self.graph.node_text_size    = json_graph.get('node_text_size', 8)
-			self.graph.link_text_size    = json_graph.get('link_text_size', 7)
-			self.graph.title_text_size   = json_graph.get('title_text_size', 15)
-			self.graph.include_svi       = json_graph.get('include_svi', False)
-			self.graph.include_lo        = json_graph.get('include_lo', False)
-			self.graph.include_serials   = json_graph.get('include_serials', False)
-			self.graph.get_stack_members = json_graph.get('get_stack_members', False)
-			self.graph.get_vss_members   = json_graph.get('get_vss_members', False)
+			self.graph.node_text_size     = json_graph.get('node_text_size', 8)
+			self.graph.link_text_size     = json_graph.get('link_text_size', 7)
+			self.graph.title_text_size    = json_graph.get('title_text_size', 15)
+			self.graph.include_svi        = json_graph.get('include_svi', False)
+			self.graph.include_lo         = json_graph.get('include_lo', False)
+			self.graph.include_serials    = json_graph.get('include_serials', False)
+			self.graph.get_stack_members  = json_graph.get('get_stack_members', False)
+			self.graph.get_vss_members    = json_graph.get('get_vss_members', False)
+			self.graph.collapse_stackwise = json_graph.get('collapse_stackwise', True)
+			self.graph.collapse_vss       = json_graph.get('collapse_vss', True)
 
 		return 1
 
@@ -111,7 +115,9 @@ class mnet_config:
 				'		"include_lo" : 0,\n' \
 				'		"include_serials" : 0,\n' \
 				'		"get_stack_members" : 0,\n' \
-				'		"get_vss_members" : 0\n' \
+				'		"get_vss_members" : 0\n,' \
+				'		"collapse_stackwise" : 1\n,' \
+				'		"collapse_vss" : 1\n' \
 				'	}\n' \
 				'}'
 
