@@ -85,6 +85,7 @@ class mnet_node_stack_member:
 	mac = None
 	img = None
 	serial = None
+	plat = None
 
 	def __init__(self):
 		self.num = 0
@@ -93,6 +94,7 @@ class mnet_node_stack_member:
 		self.mac = None
 		self.img = None
 		self.serial = None
+		self.plat = None
 
 
 class mnet_node_stack:
@@ -122,7 +124,8 @@ class mnet_node_stack:
 				self.count = 0
 			return				
 
-		serial_vbtbl = snmpobj.get_bulk(OID_3750X_SERIAL)
+		serial_vbtbl = snmpobj.get_bulk(OID_ENTPHYENTRY_SERIAL)
+		platf_vbtbl  = snmpobj.get_bulk(OID_ENTPHYENTRY_PLAT)
 
 		for row in vbtbl:
 			for n, v in row:
@@ -138,7 +141,8 @@ class mnet_node_stack:
 					m.mac  = snmpobj.cache_lookup(vbtbl, OID_STACK_MAC + '.' + idx)
 					m.img  = snmpobj.cache_lookup(vbtbl, OID_STACK_IMG + '.' + idx)
 
-					m.serial = snmpobj.cache_lookup(serial_vbtbl, OID_3750X_SERIAL + '.' + idx)
+					m.serial = snmpobj.cache_lookup(serial_vbtbl, OID_ENTPHYENTRY_SERIAL + '.' + idx)
+					m.plat   = snmpobj.cache_lookup(platf_vbtbl, OID_ENTPHYENTRY_PLAT + '.' + idx)
 
 					if (m.role == '1'):
 						m.role = 'master'
@@ -161,6 +165,62 @@ class mnet_node_stack:
 		return
 
 
+class mnet_node_vss_member:
+	ios = None
+	serial = None
+	plat = None
+
+	def __init__(self):
+		self.ios = None
+		self.serial = None
+		self.plat = None
+
+
+class mnet_node_vss:
+	members = []
+	enabled = 0
+	domain = None
+
+	def __init__(self, snmpobj = None, get_details = 0):
+		self.members = [ mnet_node_vss_member(), mnet_node_vss_member() ]
+		enabled = 0
+		domain = None
+
+		if (snmpobj != None):
+			self.get_members(snmpobj, get_details)
+
+	def get_members(self, snmpobj, get_details):
+		self.enabled = 1 if (snmpobj.get_val(OID_VSS_MODE) == '2') else 0
+		if (self.enabled == 0):
+			return
+
+		self.domain = snmpobj.get_val(OID_VSS_DOMAIN)
+
+		if (get_details == 0):
+			return
+
+		class_vbtbl  = snmpobj.get_bulk(OID_ENTPHYENTRY_CLASS)
+		ios_vbtbl    = snmpobj.get_bulk(OID_ENTPHYENTRY_IOS)
+		serial_vbtbl = snmpobj.get_bulk(OID_ENTPHYENTRY_SERIAL)
+		plat_vbtbl   = snmpobj.get_bulk(OID_ENTPHYENTRY_PLAT)
+
+		module = 0
+
+		for row in class_vbtbl:
+			for n, v in row:
+				if (v == 9):
+					t = n.prettyPrint().split('.')
+					modidx = t[12]
+					if (module > 1):
+						print('[E] More than 2 modules found for VSS device! Skipping after the second...')
+						return
+
+					self.members[module].ios    = snmpobj.cache_lookup(ios_vbtbl, OID_ENTPHYENTRY_IOS + '.' + modidx)
+					self.members[module].serial = snmpobj.cache_lookup(serial_vbtbl, OID_ENTPHYENTRY_SERIAL + '.' + modidx)
+					self.members[module].plat   = snmpobj.cache_lookup(plat_vbtbl, OID_ENTPHYENTRY_PLAT + '.' + modidx)
+					module += 1
+
+
 class mnet_node:
 	snmp_cred = None
 	crawled = 0
@@ -175,12 +235,12 @@ class mnet_node:
 	bgp_las			= None
 	hsrp_pri		= None
 	hsrp_vip		= None
-	vss_enable		= 0
-	vss_domain		= None
+	serial			= None
 
 	svis			= []
 	loopbacks		= []
 	stack			= None
+	vss				= None
 
 	# cached MIB trees
 	link_type_vbtbl	= None
@@ -201,9 +261,9 @@ class mnet_node:
 				bgp_las			= None,
 				hsrp_pri		= None,
 				hsrp_vip		= None,
-				vss_enable		= 0,
-				vss_domain		= None,
-				stack			= None
+				serial			= None,
+				stack			= None,
+				vss				= None
 			):
 		self.snmp_cred			= None
 		self.links				= []
@@ -218,8 +278,7 @@ class mnet_node:
 		self.bgp_las			= bgp_las
 		self.hsrp_pri			= hsrp_pri
 		self.hsrp_vip			= hsrp_vip
-		self.vss_enable			= vss_enable
-		self.vss_domain			= vss_domain
+		self.serial				= serial
 
 		self.svis = []
 		self.loopbacks = []
@@ -227,6 +286,10 @@ class mnet_node:
 		self.stack				= stack
 		if (self.stack == None):
 			self.stack = mnet_node_stack()
+
+		self.vss				= vss
+		if (self.vss == None):
+			self.vss = mnet_node_vss()
 
 		link_type_vbtbl	= None
 		lag_vbtbl		= None

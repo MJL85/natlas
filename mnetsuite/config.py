@@ -32,17 +32,23 @@ class mnet_config_graph:
 	title_text_size = 15 
 	include_svi	= False
 	include_lo = False
+	include_serials = False
 	get_stack_members = False
+	get_vss_members = False
 
 class mnet_config:
 	host_domains	= []
 	snmp_creds		= []
 	exclude_subnets	= []
 	allowed_subnets	= []
-	graph = mnet_config_graph()
+	graph = None
 
 	def __init__(self):
-		return
+		self.host_domains		= []
+		self.snmp_creds			= []
+		self.exclude_subnets	= []
+		self.allowed_subnets	= []
+		self.graph				= mnet_config_graph()
 
 	def load(self, filename):
 		# load config
@@ -57,12 +63,14 @@ class mnet_config:
 
 		json_graph = json_data.get('graph', None)
 		if (json_graph != None):
-			self.graph.node_text_size = json_graph.get('node_text_size', 8)
-			self.graph.link_text_size = json_graph.get('link_text_size', 7)
-			self.graph.title_text_size = json_graph.get('title_text_size', 15)
-			self.graph.include_svi = json_graph.get('include_svi', False)
-			self.graph.include_lo = json_graph.get('include_lo', False)
+			self.graph.node_text_size    = json_graph.get('node_text_size', 8)
+			self.graph.link_text_size    = json_graph.get('link_text_size', 7)
+			self.graph.title_text_size   = json_graph.get('title_text_size', 15)
+			self.graph.include_svi       = json_graph.get('include_svi', False)
+			self.graph.include_lo        = json_graph.get('include_lo', False)
+			self.graph.include_serials   = json_graph.get('include_serials', False)
 			self.graph.get_stack_members = json_graph.get('get_stack_members', False)
+			self.graph.get_vss_members   = json_graph.get('get_vss_members', False)
 
 		return 1
 
