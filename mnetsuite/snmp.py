@@ -30,8 +30,6 @@ SNMP_PORT = 161
 
 OID_SYSNAME		= '1.3.6.1.2.1.1.5.0'
 
-OID_3750X_SERIAL = '1.3.6.1.2.1.47.1.1.1.1.11'
-
 OID_SYS_SERIAL	= '1.3.6.1.4.1.9.3.6.3.0'
 OID_SYS_BOOT	= '1.3.6.1.4.1.9.2.1.73.0'
 
@@ -76,13 +74,19 @@ OID_STACK_PRI	= '1.3.6.1.4.1.9.9.500.1.2.1.1.4'
 OID_STACK_MAC	= '1.3.6.1.4.1.9.9.500.1.2.1.1.7'
 OID_STACK_IMG	= '1.3.6.1.4.1.9.9.500.1.2.1.1.8'
 
-
+OID_VSS_MODULES = '1.3.6.1.4.1.9.9.388.1.4.1.1.1'		# .modidx = 1
 OID_VSS_MODE	= '1.3.6.1.4.1.9.9.388.1.1.4.0'
 OID_VSS_DOMAIN	= '1.3.6.1.4.1.9.9.388.1.1.1.0'
+
+OID_ENTPHYENTRY_CLASS  = '1.3.6.1.2.1.47.1.1.1.1.5'		# + .modifx (3=chassis) (9=module)
+OID_ENTPHYENTRY_IOS    = '1.3.6.1.2.1.47.1.1.1.1.9'		# + .modidx
+OID_ENTPHYENTRY_SERIAL = '1.3.6.1.2.1.47.1.1.1.1.11'	# + .modidx
+OID_ENTPHYENTRY_PLAT   = '1.3.6.1.2.1.47.1.1.1.1.13'	# + .modidx
 
 # mnet-tracemac
 OID_VLANS			= '1.3.6.1.4.1.9.9.46.1.3.1.1.2'
 OID_VLAN_CAM		= '1.3.6.1.2.1.17.4.3.1.1'
+
 OID_BRIDGE_PORTNUMS	= '1.3.6.1.2.1.17.4.3.1.2'
 OID_IFINDEX			= '1.3.6.1.2.1.17.1.4.1.2'
 

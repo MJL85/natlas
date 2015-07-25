@@ -118,18 +118,11 @@ class mnet_graph:
 		print('%s (%s)' % (system_name, ip))
 
 		# collect general information about this node
-		stack = mnet_node_stack(snmpobj, self.config.graph.get_stack_members)
-		vss_enable = 1 if (snmpobj.get_val(OID_VSS_MODE) == '2') else 0
-		vss_domain = None
-
 		router = 1 if (snmpobj.get_val(OID_IP_ROUTING) == '1') else 0
 		ospf = None
 		bgp = None
 		hsrp_pri = None
 		hsrp_vip = None
-
-		if (vss_enable == 1):
-			vss_domain = snmpobj.get_val(OID_VSS_DOMAIN)
 
 		if (router == 1):
 			ospf = snmpobj.get_val(OID_OSPF)
@@ -143,6 +136,14 @@ class mnet_graph:
 			hsrp_pri = snmpobj.get_val(OID_HSRP_PRI)
 			if (hsrp_pri != None):
 				hsrp_vip = snmpobj.get_val(OID_HSRP_VIP)
+		
+		# get stack and vss info
+		stack = mnet_node_stack(snmpobj, self.config.graph.get_stack_members)
+		vss = mnet_node_vss(snmpobj, self.config.graph.get_vss_members)
+
+		serial = None
+		if ((self.config.graph.include_serials == 1) & (stack.count == 0) & (vss.enabled == 0)):
+			serial = snmpobj.get_val(OID_SYS_SERIAL)
 
 		# save this node
 		d = mnet_node(
@@ -154,8 +155,8 @@ class mnet_graph:
 				bgp_las			= bgp or None,
 				hsrp_pri		= hsrp_pri or None,
 				hsrp_vip		= hsrp_vip or None,
-				vss_enable		= vss_enable,
-				vss_domain		= vss_domain,
+				serial			= serial,
+				vss				= vss,
 				stack			= stack
 			)
 		d.snmp_cred = snmpobj._cred
@@ -404,13 +405,28 @@ class mnet_graph:
 		print('        IP: %s' % node.ip[0])
 		print('  Platform: %s' % node.plat)
 		print('   IOS Ver: %s' % node.ios)
+
+		if ((node.vss.enabled == 0) & (node.stack.count == 0)):
+			print('    Serial: %s' % node.serial)
+
 		print('   Routing: %s' % ('yes' if (node.router == 1) else 'no'))
 		print('   OSPF ID: %s' % node.ospf_id)
 		print('   BGP LAS: %s' % node.bgp_las)
 		print('  HSRP Pri: %s' % node.hsrp_pri)
 		print('  HSRP VIP: %s' % node.hsrp_vip)
-		print('  VSS Mode: %i' % node.vss_enable)
-		print('VSS Domain: %s' % node.vss_domain)
+
+		if (node.vss.enabled):
+			print('  VSS Mode: %i' % node.vss.enabled)
+			print('VSS Domain: %s' % node.vss.domain)
+			print('       VSS Slot 0:')
+			print('              IOS: %s' % node.vss.members[0].ios)
+			print('           Serial: %s' % node.vss.members[0].serial)
+			print('         Platform: %s' % node.vss.members[0].plat)
+			print('       VSS Slot 1:')
+			print('              IOS: %s' % node.vss.members[1].ios)
+			print('           Serial: %s' % node.vss.members[1].serial)
+			print('         Platform: %s' % node.vss.members[1].plat)
+
 		print(' Stack Cnt: %i' % node.stack.count)
 		
 		if ((node.stack.count > 0) & (self.config.graph.get_stack_members)):
@@ -420,6 +436,7 @@ class mnet_graph:
 				print('                 Role: %s' % (smem.role))
 				print('             Priority: %s' % (smem.pri))
 				print('                  MAC: %s' % (smem.mac))
+				print('             Platform: %s' % (smem.plat))
 				print('                Image: %s' % (smem.img))
 				print('               Serial: %s' % (smem.serial))
 
@@ -471,15 +488,32 @@ class mnet_graph:
 		node.crawled = 1
 
 		node_label = '<font point-size="10"><b>%s</b></font><br />' \
-						'<font point-size="8"><i>%s</i></font><br />' \
-						'%s<br />%s' \
-						% (node.name, node.ip[0], node.plat, node.ios)
+						'<font point-size="8"><i>%s</i></font>' \
+						% (node.name, node.ip[0])
+
+		if (((node.stack.count == 0) | (self.config.graph.get_stack_members == 0)) & (node.vss.enabled == 0)):
+			# show platform here or break it down by stack/vss later
+			node_label += '<br />%s' % node.plat
+
+		if ((self.config.graph.include_serials == 1) & (node.stack.count == 0) & (node.vss.enabled == 0)):
+			node_label += '<br />%s' % node.serial
+
+		node_label += '<br />%s' % node.ios
+		
 		node_style = 'solid'
 		node_shape = 'ellipse'
 		node_peripheries = 1
 
-		if (node.vss_enable == 1):
-			node_label += '<br />VSS %s' % node.vss_domain
+		if (node.vss.enabled == 1):
+			s1 = ''
+			s2 = ''
+			if (self.config.graph.include_serials == 1):
+				s1 = ' - %s' % node.vss.members[0].serial
+				s2 = ' - %s' % node.vss.members[1].serial
+
+			node_label += '<br />VSS %s' % node.vss.domain
+			node_label += '<br />VSS 0 - %s%s' % (node.vss.members[0].plat, s1)
+			node_label += '<br />VSS 1 - %s%s' % (node.vss.members[1].plat, s2)
 			node_peripheries = 2
 
 		if (node.stack.count > 0):
@@ -488,7 +522,10 @@ class mnet_graph:
 
 			if (self.config.graph.get_stack_members):
 				for smem in node.stack.members:
-					node_label += '<br />Switch %s - %s (%s)' % (smem.num, smem.serial, smem.role)
+					serial = ''
+					if (self.config.graph.include_serials == 1):
+						serial = ' - %s' % smem.serial
+					node_label += '<br />SW %s - %s%s (%s)' % (smem.num, smem.plat, serial, smem.role)
 
 		if (node.router == 1):
 			node_shape = 'diamond'
@@ -635,17 +672,27 @@ class mnet_graph:
 				if (snmpobj._cred != None):
 					bootf  = snmpobj.get_val(OID_SYS_BOOT)
 
-			if (n.stack.count == 0):
-				if (snmpobj._cred != None):
-					serial = snmpobj.get_val(OID_SYS_SERIAL)
-
-				f.write('"%s","%s","%s","%s","%s","%s"\n' % (n.name, n.ip[0], n.plat, n.ios, serial, bootf))
-			else:
+			if (n.stack.count > 0):
+				# stackwise
 				for smem in n.stack.members:
 					if (snmpobj._cred != None):
 						serial = smem.serial or 'NOT CONFIGURED TO POLL'
+						plat   = smem.plat or 'NOT CONFIGURED TO POLL'
 						
-					f.write('"%s","%s","?%s","%s","%s","%s"\n' % (n.name, n.ip[0], n.plat, n.ios, serial, bootf))
+					f.write('"%s","%s","%s","%s","%s","STACK","%s"\n' % (n.name, n.ip[0], plat, n.ios, serial, bootf))
+			elif (n.vss.enabled != 0):
+				#vss
+				for i in range(0, 2):
+					serial = n.vss.members[i].serial
+					plat   = n.vss.members[i].plat
+					ios    = n.vss.members[i].ios
+					f.write('"%s","%s","%s","%s","%s","VSS","%s"\n' % (n.name, n.ip[0], plat, ios, serial, bootf))
+			else:
+				# stand alone
+				if ((snmpobj._cred != None) & (n.serial == None)):
+					serial = snmpobj.get_val(OID_SYS_SERIAL)
+
+				f.write('"%s","%s","%s","%s","%s","","%s"\n' % (n.name, n.ip[0], n.plat, n.ios, serial, bootf))
 
 		f.close()
 
