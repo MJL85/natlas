@@ -78,10 +78,10 @@ OID_VSS_MODULES = '1.3.6.1.4.1.9.9.388.1.4.1.1.1'		# .modidx = 1
 OID_VSS_MODE	= '1.3.6.1.4.1.9.9.388.1.1.4.0'
 OID_VSS_DOMAIN	= '1.3.6.1.4.1.9.9.388.1.1.1.0'
 
-OID_ENTPHYENTRY_CLASS  = '1.3.6.1.2.1.47.1.1.1.1.5'		# + .modifx (3=chassis) (9=module)
-OID_ENTPHYENTRY_IOS    = '1.3.6.1.2.1.47.1.1.1.1.9'		# + .modidx
-OID_ENTPHYENTRY_SERIAL = '1.3.6.1.2.1.47.1.1.1.1.11'	# + .modidx
-OID_ENTPHYENTRY_PLAT   = '1.3.6.1.2.1.47.1.1.1.1.13'	# + .modidx
+OID_ENTPHYENTRY_CLASS    = '1.3.6.1.2.1.47.1.1.1.1.5'		# + .modifx (3=chassis) (9=module)
+OID_ENTPHYENTRY_SOFTWARE = '1.3.6.1.2.1.47.1.1.1.1.9'		# + .modidx
+OID_ENTPHYENTRY_SERIAL   = '1.3.6.1.2.1.47.1.1.1.1.11'		# + .modidx
+OID_ENTPHYENTRY_PLAT     = '1.3.6.1.2.1.47.1.1.1.1.13'		# + .modidx
 
 # mnet-tracemac
 OID_VLANS			= '1.3.6.1.4.1.9.9.46.1.3.1.1.2'
@@ -93,12 +93,30 @@ OID_IFINDEX			= '1.3.6.1.2.1.17.1.4.1.2'
 OID_ERR			= 'No Such Object currently exists at this OID'
 OID_ERR_INST	= 'No Such Instance currently exists at this OID'
 
+# OID_ENTPHYENTRY_CLASS values
+ENTPHYCLASS_OTHER         = 1
+ENTPHYCLASS_UNKNOWN       = 2
+ENTPHYCLASS_CHASSIS       = 3
+ENTPHYCLASS_BACKPLANE     = 4 
+ENTPHYCLASS_CONTAINER     = 5
+ENTPHYCLASS_POWERSUPPLY   = 6
+ENTPHYCLASS_FAN           = 7
+ENTPHYCLASS_SENSOR        = 8
+ENTPHYCLASS_MODULE        = 9
+ENTPHYCLASS_PORT          = 10
+ENTPHYCLASS_STACK         = 11
+ENTPHYCLASS_PDU           = 12
+
 class mnet_snmp:
-	_cred = []
+	success = 0
+	ver = 0
+	v2_community = None
 	_ip = None
 
-	def __init__(self, ip):
-		self._cred = []
+	def __init__(self, ip='0.0.0.0'):
+		self.success = 0
+		self.ver = 0
+		self.v2_community = None
 		self._ip = ip
 
 	#
@@ -111,8 +129,6 @@ class mnet_snmp:
 			if (cred['ver'] != 2):
 				continue
 			
-			self._cred = cred
-
 			community = cred['community']
 
 			cmdGen = cmdgen.CommandGenerator()
@@ -125,6 +141,10 @@ class mnet_snmp:
 			if errIndication:
 				continue
 			else:
+				self.ver = 2
+				self.success = 1
+				self.v2_community = community
+
 				return 1
 
 		return 0
@@ -133,17 +153,15 @@ class mnet_snmp:
 	# Get single SNMP value at OID.
 	#
 	def get_val(self, oid):
-		community = self._cred['community']
-
 		cmdGen = cmdgen.CommandGenerator()
 		errIndication, errStatus, errIndex, varBinds = cmdGen.getCmd(
-				cmdgen.CommunityData(community),
+				cmdgen.CommunityData(self.v2_community),
 				cmdgen.UdpTransportTarget((self._ip, SNMP_PORT), retries=2),
 				oid, lookupNames = False, lookupValues = True
 		)
 
 		if errIndication:
-			print '[E] get_snmp_val(%s): %s' % (community, errIndication)
+			print '[E] get_snmp_val(%s): %s' % (self.v2_community, errIndication)
 		else:
 			r = varBinds[0][1].prettyPrint()
 			if ((r == OID_ERR) | (r == OID_ERR_INST)):
@@ -159,11 +177,9 @@ class mnet_snmp:
 	# Returns 1 on success, 0 on failure.
 	#
 	def get_bulk(self, oid):
-		community = self._cred['community']
-
 		cmdGen = cmdgen.CommandGenerator()
 		errIndication, errStatus, errIndex, varBindTable = cmdGen.bulkCmd(
-				cmdgen.CommunityData(community),
+				cmdgen.CommunityData(self.v2_community),
 				cmdgen.UdpTransportTarget((self._ip, SNMP_PORT), timeout=30, retries=2),
 				0, 10,
 				oid,
@@ -171,7 +187,7 @@ class mnet_snmp:
 		)
 
 		if errIndication:
-			print '[E] get_snmp_bulk(%s): %s' % (community, errIndication)
+			print '[E] get_snmp_bulk(%s): %s' % (self.v2_community, errIndication)
 		else:
 			ret = []
 			for r in varBindTable:

@@ -84,17 +84,26 @@ class mnet_graph:
 			self._crawl_node(node, 0)
 		
 		self.root_node = node
+
+		# we may have missed chassis info
+		for n in self.nodes:
+			if ((n.serial == None) | (n.plat == None) | (n.ios == None)):
+				n.get_chassis_info()
+
 		return
 
 
 	def _get_node(self, ip, depth):
+		node = mnet_node()
+		node.name = 'UNKNOWN'
+		node.ip = [ip]
+
 		# vmware ESX reports the IP as 0.0.0.0
 		# return a minimal node since we don't have
 		# a real IP.
 		if (ip == '0.0.0.0'):
-			d = mnet_node(name = 'UNKNOWN', ip = [ip])
-			self.nodes.append(d)
-			return d
+			self.nodes.append(node)
+			return node
 
 		# see if we know about this node by its IP first.
 		# this would save us an SNMP query for the hostname.
@@ -103,24 +112,21 @@ class mnet_graph:
 				if (exip == ip):
 					return ex
 
-		snmpobj = mnet_snmp(ip)
-
 		# find valid credentials for this node
-		if (snmpobj.get_cred(self.config.snmp_creds) == 0):
+		if (node.try_snmp_creds(self.config.snmp_creds) == 0):
 			sys.stdout.write('+')
 			for i in range(0, depth):
 				sys.stdout.write('.')
 			print('UNKNOWN (%s)            << UNABLE TO CONNECT WITH SNMP' % ip)
-			d = mnet_node(name = 'UNKNOWN',	ip = [ip])
-			self.nodes.append(d)
-			return d
+			self.nodes.append(node)
+			return node
 
-		system_name = shorten_host_name(snmpobj.get_val(OID_SYSNAME), self.config.host_domains)
+		node.name = node.get_system_name(self.config.host_domains)
 
 		# verify this node isn't already in our visited
 		# list by checking for its hostname
 		for ex in self.nodes:
-			if (ex.name == system_name):
+			if (ex.name == node.name):
 				for exip in ex.ip:
 					if (exip == ip):
 						return ex
@@ -131,92 +137,25 @@ class mnet_graph:
 		sys.stdout.write('+')
 		for i in range(0, depth):
 			sys.stdout.write('.')
-		print('%s (%s)' % (system_name, ip))
+		print('%s (%s)' % (node.name, ip))
 
-		# collect general information about this node
-		router = 1 if (snmpobj.get_val(OID_IP_ROUTING) == '1') else 0
-		ospf = None
-		bgp = None
-		hsrp_pri = None
-		hsrp_vip = None
+		node.opts.get_router = True
+		node.opts.get_ospf_id = True
+		node.opts.get_bgp_las = True
+		node.opts.get_hsrp_pri = True
+		node.opts.get_hsrp_vip = True
+		node.opts.get_serial = self.config.graph.include_serials
+		node.opts.get_stack = True
+		node.opts.get_stack_details = self.config.graph.get_stack_members
+		node.opts.get_vss = True
+		node.opts.get_vss_details = self.config.graph.get_vss_members
+		node.opts.get_svi = self.config.graph.include_svi
+		node.opts.get_lo = self.config.graph.include_lo
 
-		if (router == 1):
-			ospf = snmpobj.get_val(OID_OSPF)
-			if (ospf != None):
-				ospf = snmpobj.get_val(OID_OSPF_ID)
+		node.query_node()
+		self.nodes.append(node)
 
-			bgp = snmpobj.get_val(OID_BGP_LAS)
-			if (bgp == '0'):	# 4500x is reporting 0 with disabled
-				bgp = None
-
-			hsrp_pri = snmpobj.get_val(OID_HSRP_PRI)
-			if (hsrp_pri != None):
-				hsrp_vip = snmpobj.get_val(OID_HSRP_VIP)
-		
-		# get stack and vss info
-		stack = mnet_node_stack(snmpobj, self.config.graph.get_stack_members)
-		vss = mnet_node_vss(snmpobj, self.config.graph.get_vss_members)
-
-		serial = None
-		if ((self.config.graph.include_serials == 1) & (stack.count == 0) & (vss.enabled == 0)):
-			serial = snmpobj.get_val(OID_SYS_SERIAL)
-
-		# save this node
-		d = mnet_node(
-				name			= system_name,
-				ip				= [ip],
-				plat			= None,
-				router			= router,
-				ospf_id			= ospf or None,
-				bgp_las			= bgp or None,
-				hsrp_pri		= hsrp_pri or None,
-				hsrp_vip		= hsrp_vip or None,
-				serial			= serial,
-				vss				= vss,
-				stack			= stack
-			)
-		d.snmp_cred = snmpobj._cred
-		self.nodes.append(d)
-
-		# Pull SVI info if needed
-		if (self.config.graph.include_svi == True):
-			d.svi_vbtbl			= snmpobj.get_bulk(OID_SVI_VLANIF)
-			d.ifip_vbtbl		= snmpobj.get_bulk(OID_IF_IP)
-
-			for row in d.svi_vbtbl:
-				for n, v in row:
-					vlan = n.prettyPrint().split('.')[14]
-					svi = mnet_node_svi(vlan)
-					for ifrow in d.ifip_vbtbl:
-						for ifn, ifv in ifrow:
-							if (ifn.prettyPrint().startswith(OID_IF_IP_ADDR)):
-								if (v == ifv):
-									t = ifn.prettyPrint().split('.')
-									svi_ip = ".".join(t[10:])
-									mask = snmpobj.cache_lookup(d.ifip_vbtbl, OID_IF_IP_NETM + svi_ip)
-									nbits = get_net_bits_from_mask(mask)
-									svi_ip = '%s/%i' % (svi_ip, nbits)
-									svi.ip.append(svi_ip)
-
-					d.svis.append(svi)
-
-		# Pull loopback info if needed
-		if (self.config.graph.include_lo == True):
-			d.ethif_vbtbl = snmpobj.get_bulk(OID_ETH_IF)
-
-			if (d.ifip_vbtbl == None):
-				d.ifip_vbtbl = snmpobj.get_bulk(OID_IF_IP)
-			
-			for row in d.ethif_vbtbl:
-				for n, v in row:
-					if (n.prettyPrint().startswith(OID_ETH_IF_TYPE) & (v == 24)):
-						ifidx = n.prettyPrint().split('.')[10]
-						lo_name = snmpobj.cache_lookup(d.ethif_vbtbl, OID_ETH_IF_DESC + '.' + ifidx)
-						lo_ip = get_ip_from_ifidx(snmpobj, d.ifip_vbtbl, ifidx)
-						lo = mnet_node_lo(lo_name, lo_ip) 
-						d.loopbacks.append(lo)
-
-		return d
+		return node
 
 
 	#
@@ -241,7 +180,7 @@ class mnet_graph:
 			return
 
 		# may be a leaf we couldn't connect to previously
-		if (node.snmp_cred == None):
+		if (node.snmpobj.success == 0):
 			return
 
 		# print some info to stdout
@@ -251,103 +190,48 @@ class mnet_graph:
 		print('%s (%s)' % (node.name, node.ip[0]))
 
 		# get the cached snmp credentials
-		snmpobj = mnet_snmp(node.ip[0])
-		snmpobj._cred = node.snmp_cred
+		snmpobj = node.snmpobj
 
-		children = []
-		
+		# list of valid neighbors to crawl next
+		valid_neighbors = []
+
 		# get list of CDP neighbors
-		node.cdp_vbtbl = snmpobj.get_bulk(OID_CDP)
-		if (node.cdp_vbtbl == None):
+		neighbors = node.get_neighbors()
+		if (neighbors == None):
 			return
 
-		# cache some common MIB trees
-		node.link_type_vbtbl	= snmpobj.get_bulk(OID_VTP_TRUNK)
-		node.lag_vbtbl			= snmpobj.get_bulk(OID_LAG_LACP)
-		node.vlan_vbtbl			= snmpobj.get_bulk(OID_IF_VLAN)
-		node.ifname_vbtbl		= snmpobj.get_bulk(OID_IFNAME)
-		
-		if (node.ifip_vbtbl == None):
-			node.ifip_vbtbl		= snmpobj.get_bulk(OID_IF_IP)
+		for neighbor in neighbors:
+			rip = neighbor['ip']
+			rname = neighbor['name']
+			ifidx = neighbor['ifidx']
+			ifidx2 = neighbor['ifidx2']
 
-		for row in node.cdp_vbtbl:
-			for name, val in row:
-				# process only if this row is a CDP_DEVID
-				if (name.prettyPrint().startswith(OID_CDP_DEVID) == 0):
-					continue
+			# if the remote IP is not allowed, stop processing it here
+			if (self.is_node_allowed(rip) == 0):
+				continue
 
-				t = name.prettyPrint().split('.')
-				ifidx = t[14]
+			link = node.get_node_link_info(ifidx, ifidx2)
 
-				# get remote IP
-				rip = snmpobj.cache_lookup(node.cdp_vbtbl, OID_CDP_IPADDR + '.' + ifidx + '.' + t[15])
-				rip = convert_ip_int_str(rip)
+			# get the child info
+			if ((self.is_node_allowed(rip) == 1) & (rip != 'UNKNOWN')):
+				child = self._get_node(rip, depth+1)
+				if (child != None):
+					# if we couldn't pull info from SNMP fill in what we know
+					if (child.snmpobj.success == 0):
+						child.name = shorten_host_name(rname, self.config.host_domains)
 
-				# if the remote IP is not allowed, stop processing it here
-				if (self.is_node_allowed(rip) == 0):
-					continue
+					# CDP advertises the platform
+					child.plat = link.remote_platform
+					child.ios = link.remote_ios
 
-				# get local port
-				lport = get_ifname(snmpobj, node.ifname_vbtbl, ifidx)
+					# link child to parent
+					link.node = child
+					self.add_link(node, link)
+					valid_neighbors.append(child)
 
-				# get remote port
-				rport = snmpobj.cache_lookup(node.cdp_vbtbl, OID_CDP_DEVPORT + '.' + ifidx + '.' + t[15])
-				rport = shorten_port_name(rport)
-
-				# get remote platform
-				rplat = snmpobj.cache_lookup(node.cdp_vbtbl, OID_CDP_DEVPLAT + '.' + ifidx + '.' + t[15])
-
-				# get IOS version
-				rios = snmpobj.cache_lookup(node.cdp_vbtbl, OID_CDP_IOS + '.' + ifidx + '.' + t[15])
-				if (rios != None):
-					try:
-						rios = binascii.unhexlify(rios[2:])
-					except:
-						pass
-					rios_s = re.search('Version:? ([^ ,]*)', rios)
-					if (rios_s):
-						rios = rios_s.group(1)
-
-				# get link type (trunk ?)
-				link_type = snmpobj.cache_lookup(node.link_type_vbtbl, OID_VTP_TRUNK + '.' + ifidx)
-
-				# get LAG membership
-				lag = snmpobj.cache_lookup(node.lag_vbtbl, OID_LAG_LACP + '.' + ifidx)
-				lag = get_ifname(snmpobj, node.ifname_vbtbl, lag)
-
-				# get VLAN info
-				vlan = snmpobj.cache_lookup(node.vlan_vbtbl, OID_IF_VLAN + '.' + ifidx)
-
-				# get IP address
-				lifip = get_ip_from_ifidx(snmpobj, node.ifip_vbtbl, ifidx)
-
-				# get the child info
-				if ((self.is_node_allowed(rip) == 1) & (rip != 'UNKNOWN')):
-					child = self._get_node(rip, depth+1)
-					if (child != None):
-						# if we couldn't pull info from SNMP fill in what we know
-						if (child.snmp_cred == None):
-							child.name = shorten_host_name(val.prettyPrint(), self.config.host_domains)
-
-						# CDP advertises the platform
-						child.plat = rplat.replace('cisco ', '')
-						child.ios = rios
-
-						# link child to parent
-						link = mnet_node_link(node			= child,
-											link_type		= link_type,
-											vlan			= vlan,
-											local_port		= lport,
-											remote_port		= rport,
-											local_lag		= lag,
-											remote_lag		= None,
-											local_if_ip		= lifip,
-											remote_if_ip	= None)
-						self.add_link(node, link)
-						children.append(child)
-
-		for child in children:
-			self._crawl_node(child, depth+1)
+		# crawl the valid neighbors
+		for n in valid_neighbors:
+			self._crawl_node(n, depth+1)
 
 
 	#
@@ -768,38 +652,28 @@ class mnet_graph:
 			return
 
 		for n in self.nodes:
-			# pull info here that wasn't needed for the graph
-			serial = ''
-			bootf = ''
-			
-			if (n.ip[0]):
-				snmpobj = mnet_snmp(n.ip[0])
-				snmpobj._cred = n.snmp_cred
-
-				if (snmpobj._cred != None):
-					bootf  = snmpobj.get_val(OID_SYS_BOOT)
+			# get info that we may not have yet
+			n.opts.get_serial = True
+			n.opts.get_plat   = True
+			n.opts.get_bootf  = True
+			n.query_node()
 
 			if (n.stack.count > 0):
 				# stackwise
 				for smem in n.stack.members:
-					if (snmpobj._cred != None):
-						serial = smem.serial or 'NOT CONFIGURED TO POLL'
-						plat   = smem.plat or 'NOT CONFIGURED TO POLL'
-						
-					f.write('"%s","%s","%s","%s","%s","STACK","%s"\n' % (n.name, n.ip[0], plat, n.ios, serial, bootf))
+					serial = smem.serial or 'NOT CONFIGURED TO POLL'
+					plat   = smem.plat or 'NOT CONFIGURED TO POLL'
+					f.write('"%s","%s","%s","%s","%s","STACK","%s"\n' % (n.name, n.ip[0], plat, n.ios, serial, n.bootfile))
 			elif (n.vss.enabled != 0):
 				#vss
 				for i in range(0, 2):
 					serial = n.vss.members[i].serial
 					plat   = n.vss.members[i].plat
 					ios    = n.vss.members[i].ios
-					f.write('"%s","%s","%s","%s","%s","VSS","%s"\n' % (n.name, n.ip[0], plat, ios, serial, bootf))
+					f.write('"%s","%s","%s","%s","%s","VSS","%s"\n' % (n.name, n.ip[0], plat, ios, serial, n.bootfile))
 			else:
 				# stand alone
-				if ((snmpobj._cred != None) & (n.serial == None)):
-					serial = snmpobj.get_val(OID_SYS_SERIAL)
-
-				f.write('"%s","%s","%s","%s","%s","","%s"\n' % (n.name, n.ip[0], n.plat, n.ios, serial, bootf))
+				f.write('"%s","%s","%s","%s","%s","","%s"\n' % (n.name, n.ip[0], n.plat, n.ios, n.serial, n.bootfile))
 
 		f.close()
 

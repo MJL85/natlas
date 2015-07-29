@@ -25,6 +25,7 @@
 '''
 
 from snmp import *
+from util import *
 
 class mnet_node_link:
 	node			= None
@@ -36,10 +37,12 @@ class mnet_node_link:
 	remote_lag		= None
 	local_if_ip		= None
 	remote_if_ip	= None
+	remote_platform = None
+	remote_ios		= None
 
 	def __init__(
 				self,
-				node,
+				node			= None,
 				link_type		= None,
 				vlan			= None,
 				local_port		= None,
@@ -47,7 +50,9 @@ class mnet_node_link:
 				local_lag		= None,
 				remote_lag		= None,
 				local_if_ip		= None,
-				remote_if_ip	= None
+				remote_if_ip	= None,
+				remote_platform = None,
+				remote_ios		= None
 			):
 		self.node			= node
 		self.link_type		= link_type
@@ -58,6 +63,8 @@ class mnet_node_link:
 		self.remote_lag		= remote_lag
 		self.local_if_ip	= local_if_ip
 		self.remote_if_ip	= remote_if_ip
+		self.remote_platform = remote_platform
+		self.remote_ios		= remote_ios
 
 
 class mnet_node_svi:
@@ -200,7 +207,7 @@ class mnet_node_vss:
 			return
 
 		class_vbtbl  = snmpobj.get_bulk(OID_ENTPHYENTRY_CLASS)
-		ios_vbtbl    = snmpobj.get_bulk(OID_ENTPHYENTRY_IOS)
+		ios_vbtbl    = snmpobj.get_bulk(OID_ENTPHYENTRY_SOFTWARE)
 		serial_vbtbl = snmpobj.get_bulk(OID_ENTPHYENTRY_SERIAL)
 		plat_vbtbl   = snmpobj.get_bulk(OID_ENTPHYENTRY_PLAT)
 
@@ -215,14 +222,58 @@ class mnet_node_vss:
 						print('[E] More than 2 modules found for VSS device! Skipping after the second...')
 						return
 
-					self.members[module].ios    = snmpobj.cache_lookup(ios_vbtbl, OID_ENTPHYENTRY_IOS + '.' + modidx)
+					self.members[module].ios    = snmpobj.cache_lookup(ios_vbtbl, OID_ENTPHYENTRY_SOFTWARE + '.' + modidx)
 					self.members[module].serial = snmpobj.cache_lookup(serial_vbtbl, OID_ENTPHYENTRY_SERIAL + '.' + modidx)
 					self.members[module].plat   = snmpobj.cache_lookup(plat_vbtbl, OID_ENTPHYENTRY_PLAT + '.' + modidx)
 					module += 1
 
 
 class mnet_node:
-	snmp_cred = None
+
+	class _node_opts:
+		get_name = False
+		get_ip = False
+		get_plat = False
+		get_ios = False
+		get_router = False
+		get_ospf_id = False
+		get_bgp_las = False
+		get_hsrp_pri = False
+		get_hsrp_vip = False
+		get_serial = False
+		get_stack = False
+		get_stack_details = False
+		get_vss = False
+		get_vss_details = False
+		get_svi = False
+		get_lo = False
+		get_bootf = False
+	
+		def __init__(self):
+			self.reset()
+
+		def reset(self):
+			self.get_name = False
+			self.get_ip = False
+			self.get_plat = False
+			self.get_ios = False
+			self.get_router = False
+			self.get_ospf_id = False
+			self.get_bgp_las = False
+			self.get_hsrp_pri = False
+			self.get_hsrp_vip = False
+			self.get_serial = False
+			self.get_stack = False
+			self.get_stack_details = False
+			self.get_vss = False
+			self.get_vss_details = False
+			self.get_svi = False
+			self.get_lo = False
+			self.get_bootf = False			
+
+
+	opts = None
+	snmpobj			= mnet_snmp()
 	crawled = 0
 	links = []
 
@@ -236,6 +287,7 @@ class mnet_node:
 	hsrp_pri		= None
 	hsrp_vip		= None
 	serial			= None
+	bootfile		= None
 
 	svis			= []
 	loopbacks		= []
@@ -250,46 +302,30 @@ class mnet_node:
 	ifip_vbtbl		= None
 	ethif_vbtbl		= None
 
-	def __init__(
-				self,
-				name			= None,
-				ip				= None,
-				plat			= None,
-				ios				= None,
-				router			= None,
-				ospf_id			= None,
-				bgp_las			= None,
-				hsrp_pri		= None,
-				hsrp_vip		= None,
-				serial			= None,
-				stack			= None,
-				vss				= None
-			):
-		self.snmp_cred			= None
+	def __init__(self):
+		self.opts				= mnet_node._node_opts()
+		self.snmpobj			= mnet_snmp()
+
 		self.links				= []
 		self.crawled			= 0
 
-		self.name				= name
-		self.ip					= ip
-		self.plat				= plat
-		self.ios				= ios
-		self.router				= router
-		self.ospf_id			= ospf_id
-		self.bgp_las			= bgp_las
-		self.hsrp_pri			= hsrp_pri
-		self.hsrp_vip			= hsrp_vip
-		self.serial				= serial
+		self.name				= None
+		self.ip					= None
+		self.plat				= None
+		self.ios				= None
+		self.router				= None
+		self.ospf_id			= None
+		self.bgp_las			= None
+		self.hsrp_pri			= None
+		self.hsrp_vip			= None
+		self.serial				= None
+		self.bootfile			= None
 
 		self.svis = []
 		self.loopbacks = []
 
-		self.stack				= stack
-		if (self.stack == None):
-			self.stack = mnet_node_stack()
-
-		self.vss				= vss
-		if (self.vss == None):
-			self.vss = mnet_node_vss()
+		self.stack = mnet_node_stack()
+		self.vss = mnet_node_vss()
 
 		link_type_vbtbl	= None
 		lag_vbtbl		= None
@@ -300,4 +336,253 @@ class mnet_node:
 
 	def add_link(self, link):
 		self.links.append(link)
+
+
+	# find valid credentials for this node
+	def try_snmp_creds(self, snmp_creds):
+		if (self.snmpobj.success == 0):
+			self.snmpobj._ip = self.ip[0]
+			if (self.snmpobj.get_cred(snmp_creds) == 0):
+				return 0
+		return 1
+
+
+	# Query this node.
+	# Set .opts and .snmp_creds before calling.
+	def query_node(self):
+		if (self.snmpobj.ver == 0):
+			# call try_snmp_creds() first or it failed to find good creds
+			return 0
+
+		snmpobj = self.snmpobj
+
+		# router
+		if (self.opts.get_router == True):
+			if (self.router == None):
+				self.router = 1 if (snmpobj.get_val(OID_IP_ROUTING) == '1') else 0
+
+			if (self.router == 1):
+				# OSPF
+				if (self.opts.get_ospf_id == True):
+					self.ospf_id = snmpobj.get_val(OID_OSPF)
+					if (self.ospf_id != None):
+						self.ospf_id = snmpobj.get_val(OID_OSPF_ID)
+
+				# BGP
+				if (self.opts.get_bgp_las == True):
+					self.bgp_las = snmpobj.get_val(OID_BGP_LAS)
+					if (self.bgp_las == '0'):	# 4500x is reporting 0 with disabled
+						self.bgp_las = None
+
+				# HSRP
+				if (self.opts.get_hsrp_pri == True):
+					self.hsrp_pri = snmpobj.get_val(OID_HSRP_PRI)
+					if (self.hsrp_pri != None):
+						self.hsrp_vip = snmpobj.get_val(OID_HSRP_VIP)
+
+		# stack
+		if (self.opts.get_stack):
+			self.stack = mnet_node_stack(snmpobj, self.opts.get_stack_details)
+
+		# vss
+		if (self.opts.get_vss):
+			self.vss = mnet_node_vss(snmpobj, self.opts.get_vss_details)
+		
+		# serial
+		if ((self.opts.get_serial == 1) & (self.stack.count == 0) & (self.vss.enabled == 0)):
+			self.serial = snmpobj.get_val(OID_SYS_SERIAL)
+
+		# SVI
+		if (self.opts.get_svi == True):
+			self.svi_vbtbl		= snmpobj.get_bulk(OID_SVI_VLANIF)
+			self.ifip_vbtbl		= snmpobj.get_bulk(OID_IF_IP)
+
+			for row in self.svi_vbtbl:
+				for n, v in row:
+					vlan = n.prettyPrint().split('.')[14]
+					svi = mnet_node_svi(vlan)
+					for ifrow in self.ifip_vbtbl:
+						for ifn, ifv in ifrow:
+							if (ifn.prettyPrint().startswith(OID_IF_IP_ADDR)):
+								if (v == ifv):
+									t = ifn.prettyPrint().split('.')
+									svi_ip = ".".join(t[10:])
+									mask = snmpobj.cache_lookup(self.ifip_vbtbl, OID_IF_IP_NETM + svi_ip)
+									nbits = get_net_bits_from_mask(mask)
+									svi_ip = '%s/%i' % (svi_ip, nbits)
+									svi.ip.append(svi_ip)
+
+					self.svis.append(svi)
+
+		# loopback
+		if (self.opts.get_lo == True):
+			self.ethif_vbtbl = snmpobj.get_bulk(OID_ETH_IF)
+
+			if (self.ifip_vbtbl == None):
+				self.ifip_vbtbl = snmpobj.get_bulk(OID_IF_IP)
+			
+			for row in self.ethif_vbtbl:
+				for n, v in row:
+					if (n.prettyPrint().startswith(OID_ETH_IF_TYPE) & (v == 24)):
+						ifidx = n.prettyPrint().split('.')[10]
+						lo_name = snmpobj.cache_lookup(self.ethif_vbtbl, OID_ETH_IF_DESC + '.' + ifidx)
+						lo_ip = get_ip_from_ifidx(snmpobj, self.ifip_vbtbl, ifidx)
+						lo = mnet_node_lo(lo_name, lo_ip) 
+						self.loopbacks.append(lo)
+
+		# bootfile
+		if (self.opts.get_bootf):
+			self.bootfile = snmpobj.get_val(OID_SYS_BOOT)
+
+		# reset the get options
+		self.opts.reset()
+		return 1
+
+
+	#
+	# Get a list of neighbor IP addresses.
+	# Pulled from CDP neighbor table.
+	#
+	def get_neighbors(self):
+		children = []
+		snmpobj = self.snmpobj
+		
+		# get list of CDP neighbors
+		self.cdp_vbtbl = snmpobj.get_bulk(OID_CDP)
+		if (self.cdp_vbtbl == None):
+			return None
+
+		# cache some common MIB trees
+		self.link_type_vbtbl	= snmpobj.get_bulk(OID_VTP_TRUNK)
+		self.lag_vbtbl			= snmpobj.get_bulk(OID_LAG_LACP)
+		self.vlan_vbtbl			= snmpobj.get_bulk(OID_IF_VLAN)
+		self.ifname_vbtbl		= snmpobj.get_bulk(OID_IFNAME)
+		
+		if (self.ifip_vbtbl == None):
+			self.ifip_vbtbl		= snmpobj.get_bulk(OID_IF_IP)
+
+		for row in self.cdp_vbtbl:
+			for name, val in row:
+				# process only if this row is a CDP_DEVID
+				if (name.prettyPrint().startswith(OID_CDP_DEVID) == 0):
+					continue
+
+				t = name.prettyPrint().split('.')
+				ifidx = t[14]
+
+				# get remote IP
+				rip = snmpobj.cache_lookup(self.cdp_vbtbl, OID_CDP_IPADDR + '.' + ifidx + '.' + t[15])
+				rip = convert_ip_int_str(rip)
+
+				# collect CDP info into dict
+				n = {}
+				n['ip'] = rip
+				n['name'] = val.prettyPrint()
+				n['ifidx'] = ifidx
+				n['ifidx2'] = t[15]
+
+				children.append(n)
+
+		return children
+
+
+	def get_node_link_info(self, ifidx, ifidx2):
+		snmpobj = self.snmpobj
+
+		# get local port
+		lport = get_ifname(snmpobj, self.ifname_vbtbl, ifidx)
+
+		# get remote port
+		rport = snmpobj.cache_lookup(self.cdp_vbtbl, OID_CDP_DEVPORT + '.' + ifidx + '.' + ifidx2)
+		rport = shorten_port_name(rport)
+
+		# get remote platform
+		rplat = snmpobj.cache_lookup(self.cdp_vbtbl, OID_CDP_DEVPLAT + '.' + ifidx + '.' + ifidx2)
+
+		# get IOS version
+		rios = snmpobj.cache_lookup(self.cdp_vbtbl, OID_CDP_IOS + '.' + ifidx + '.' + ifidx2)
+		if (rios != None):
+			try:
+				rios = binascii.unhexlify(rios[2:])
+			except:
+				pass
+			rios_s = re.search('Version:? ([^ ,]*)', rios)
+			if (rios_s):
+				rios = rios_s.group(1)
+
+		# get link type (trunk ?)
+		link_type = snmpobj.cache_lookup(self.link_type_vbtbl, OID_VTP_TRUNK + '.' + ifidx)
+
+		# get LAG membership
+		lag = snmpobj.cache_lookup(self.lag_vbtbl, OID_LAG_LACP + '.' + ifidx)
+		lag = get_ifname(snmpobj, self.ifname_vbtbl, lag)
+
+		# get VLAN info
+		vlan = snmpobj.cache_lookup(self.vlan_vbtbl, OID_IF_VLAN + '.' + ifidx)
+
+		# get IP address
+		lifip = get_ip_from_ifidx(snmpobj, self.ifip_vbtbl, ifidx)
+
+		link = mnet_node_link(link_type		= link_type,
+							vlan			= vlan,
+							local_port		= lport,
+							remote_port		= rport,
+							local_lag		= lag,
+							remote_lag		= None,
+							local_if_ip		= lifip,
+							remote_if_ip	= None,
+							remote_platform = rplat,
+							remote_ios		= rios)
+		return link
+
+
+	def get_chassis_info(self):
+		# Slow but reliable method by using SNMP directly.
+		# Usually we will get this via CDP.
+		snmpobj = self.snmpobj
+
+		if ((self.stack.count > 0) | (self.vss.enabled == 1)):
+			return
+
+		class_vbtbl  = snmpobj.get_bulk(OID_ENTPHYENTRY_CLASS)
+		serial_vbtbl = snmpobj.get_bulk(OID_ENTPHYENTRY_SERIAL)
+		platf_vbtbl  = snmpobj.get_bulk(OID_ENTPHYENTRY_PLAT)
+		ios_vbtbl    = snmpobj.get_bulk(OID_ENTPHYENTRY_SOFTWARE)
+
+		if (class_vbtbl == None):
+			return
+
+		for row in class_vbtbl:
+			for n, v in row:
+				if (v != ENTPHYCLASS_CHASSIS):
+					continue
+
+				t = n.prettyPrint().split('.')
+				idx = t[12]
+
+				self.serial = snmpobj.cache_lookup(serial_vbtbl, OID_ENTPHYENTRY_SERIAL + '.' + idx)
+				self.plat   = snmpobj.cache_lookup(platf_vbtbl, OID_ENTPHYENTRY_PLAT + '.' + idx)
+				self.ios    = snmpobj.cache_lookup(ios_vbtbl, OID_ENTPHYENTRY_SOFTWARE + '.' + idx)
+
+		# modular switches might have IOS on a module rather than chassis
+		if (self.ios == ''):
+			for row in class_vbtbl:
+				for n, v in row:
+					if (v != ENTPHYCLASS_MODULE):
+						continue
+
+					t = n.prettyPrint().split('.')
+					idx = t[12]
+
+					self.ios = snmpobj.cache_lookup(ios_vbtbl, OID_ENTPHYENTRY_SOFTWARE + '.' + idx)
+					if (self.ios != ''):
+						break
+
+				if (self.ios != ''):
+					break
+		return
+
+
+	def get_system_name(self, domains):
+		return shorten_host_name(self.snmpobj.get_val(OID_SYSNAME), domains)
 

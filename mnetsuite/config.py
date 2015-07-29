@@ -115,8 +115,8 @@ class mnet_config:
 				'		"include_lo" : 0,\n' \
 				'		"include_serials" : 0,\n' \
 				'		"get_stack_members" : 0,\n' \
-				'		"get_vss_members" : 0\n,' \
-				'		"collapse_stackwise" : 1\n,' \
+				'		"get_vss_members" : 0,\n' \
+				'		"collapse_stackwise" : 1,\n' \
 				'		"collapse_vss" : 1\n' \
 				'	}\n' \
 				'}'
