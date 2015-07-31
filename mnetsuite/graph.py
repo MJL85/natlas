@@ -88,7 +88,8 @@ class mnet_graph:
 		# we may have missed chassis info
 		for n in self.nodes:
 			if ((n.serial == None) | (n.plat == None) | (n.ios == None)):
-				n.get_chassis_info()
+				n.opts.get_chassis_info = True
+				n.query_node()
 
 		return
 
@@ -213,7 +214,7 @@ class mnet_graph:
 			link = node.get_node_link_info(ifidx, ifidx2)
 
 			# get the child info
-			if ((self.is_node_allowed(rip) == 1) & (rip != 'UNKNOWN')):
+			if (rip != 'UNKNOWN'):
 				child = self._get_node(rip, depth+1)
 				if (child != None):
 					# if we couldn't pull info from SNMP fill in what we know
@@ -284,6 +285,10 @@ class mnet_graph:
 								ex_link.remote_if_ip = link.local_if_ip
 							if ((link.local_lag != 'UNKNOWN') & (ex_link.remote_lag == None)):
 								ex_link.remote_lag = link.local_lag
+							if ((link.local_native_vlan != None) & (ex_link.remote_native_vlan == None)):
+								ex_link.remote_native_vlan = link.local_native_vlan
+							if ((link.local_allowed_vlans != None) & (ex_link.remote_allowed_vlans == None)):
+								ex_link.remote_allowed_vlans = link.local_allowed_vlans
 							return
 
 		node.add_link(link)
@@ -552,12 +557,24 @@ class mnet_graph:
 				# Trunk = Bold/Blue
 				link_color = 'blue'
 				link_style = 'bold'
+
+				if ((link.local_native_vlan == link.remote_native_vlan) | (link.remote_native_vlan == None)):
+					link_label += '\nNative %s' % link.local_native_vlan
+				else:
+					link_label += '\nNative P:%s C:%s' % (link.local_native_vlan, link.remote_native_vlan)
+
+				if (link.local_allowed_vlans == link.remote_allowed_vlans):
+					link_label += '\nAllowed %s' % link.local_allowed_vlans
+				else:
+					link_label += '\nAllowed P:%s' % link.local_allowed_vlans
+					if (link.remote_allowed_vlans != None):
+						link_label += '\nAllowed C:%s' % link.remote_allowed_vlans
 			elif (link.link_type is None):
 				# Routed = Bold/Red
 				link_color = 'red'
 				link_style = 'bold'
 			else:
-				# Switched, include VLAN ID in label
+				# Switched access, include VLAN ID in label
 				if (link.vlan != None):
 					link_label += '\nVLAN %s' % link.vlan
 

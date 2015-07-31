@@ -43,8 +43,10 @@ OID_CDP_DEVPORT	= '1.3.6.1.4.1.9.9.23.1.2.1.1.7'
 OID_CDP_DEVPLAT	= '1.3.6.1.4.1.9.9.23.1.2.1.1.8'
 OID_CDP_INT		= '1.3.6.1.4.1.9.9.23.1.1.1.1.'			# 6.ifidx
 
-OID_VTP_TRUNK	= '1.3.6.1.4.1.9.9.46.1.6.1.1.14'		# + ifidx (BULK)
-OID_LAG_LACP	= '1.2.840.10006.300.43.1.2.1.1.12'		# + ifidx (BULK)
+OID_TRUNK_ALLOW  = '1.3.6.1.4.1.9.9.46.1.6.1.1.4'		# + ifidx (Allowed VLANs)
+OID_TRUNK_NATIVE = '1.3.6.1.4.1.9.9.46.1.6.1.1.5'		# + ifidx (Native VLAN)
+OID_TRUNK_VTP	 = '1.3.6.1.4.1.9.9.46.1.6.1.1.14'		# + ifidx (VTP Status)
+OID_LAG_LACP	 = '1.2.840.10006.300.43.1.2.1.1.12'	# + ifidx (BULK)
 
 OID_IP_ROUTING	= '1.3.6.1.2.1.4.1.0'
 OID_IF_VLAN		= '1.3.6.1.4.1.9.9.68.1.2.2.1.2'		# + ifidx (BULK)
