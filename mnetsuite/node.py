@@ -26,11 +26,16 @@
 
 from snmp import *
 from util import *
+import sys
 
 class mnet_node_link:
 	node			= None
 	link_type		= None
 	vlan			= None
+	local_native_vlan		= None
+	local_allowed_vlans		= None
+	remote_native_vlan		= None
+	remote_allowed_vlans	= None
 	local_port		= None
 	remote_port		= None
 	local_lag		= None
@@ -42,29 +47,37 @@ class mnet_node_link:
 
 	def __init__(
 				self,
-				node			= None,
-				link_type		= None,
-				vlan			= None,
-				local_port		= None,
-				remote_port		= None,
-				local_lag		= None,
-				remote_lag		= None,
-				local_if_ip		= None,
-				remote_if_ip	= None,
-				remote_platform = None,
-				remote_ios		= None
+				node					= None,
+				link_type				= None,
+				vlan					= None,
+				local_allowed_vlans		= None,
+				local_native_vlan		= None,
+				remote_allowed_vlans	= None,
+				remote_native_vlan		= None,
+				local_port				= None,
+				remote_port				= None,
+				local_lag				= None,
+				remote_lag				= None,
+				local_if_ip				= None,
+				remote_if_ip			= None,
+				remote_platform			= None,
+				remote_ios				= None
 			):
-		self.node			= node
-		self.link_type		= link_type
-		self.vlan			= vlan
-		self.local_port		= local_port
-		self.remote_port	= remote_port
-		self.local_lag		= local_lag
-		self.remote_lag		= remote_lag
-		self.local_if_ip	= local_if_ip
-		self.remote_if_ip	= remote_if_ip
-		self.remote_platform = remote_platform
-		self.remote_ios		= remote_ios
+		self.node					= node
+		self.link_type				= link_type
+		self.vlan					= vlan
+		self.local_native_vlan		= local_native_vlan
+		self.local_allowed_vlans	= local_allowed_vlans
+		self.remote_native_vlan		= remote_native_vlan
+		self.remote_allowed_vlans	= remote_allowed_vlans
+		self.local_port				= local_port
+		self.remote_port			= remote_port
+		self.local_lag				= local_lag
+		self.remote_lag				= remote_lag
+		self.local_if_ip			= local_if_ip
+		self.remote_if_ip			= remote_if_ip
+		self.remote_platform		= remote_platform
+		self.remote_ios				= remote_ios
 
 
 class mnet_node_svi:
@@ -248,6 +261,7 @@ class mnet_node:
 		get_svi = False
 		get_lo = False
 		get_bootf = False
+		get_chassis_info = False
 	
 		def __init__(self):
 			self.reset()
@@ -269,7 +283,8 @@ class mnet_node:
 			self.get_vss_details = False
 			self.get_svi = False
 			self.get_lo = False
-			self.get_bootf = False			
+			self.get_bootf = False
+			self.get_chassis_info = False
 
 
 	opts = None
@@ -301,6 +316,8 @@ class mnet_node:
 	ifname_vbtbl	= None
 	ifip_vbtbl		= None
 	ethif_vbtbl		= None
+	trk_allowed_vbtbl = None
+	trk_native_vbtbl  = None
 
 	def __init__(self):
 		self.opts				= mnet_node._node_opts()
@@ -333,6 +350,8 @@ class mnet_node:
 		ifname_vbtbl	= None
 		ifip_vbtbl		= None
 		ethif_vbtbl		= None
+		trk_allowed_vbtbl = None
+		trk_native_vbtbl  = None
 
 	def add_link(self, link):
 		self.links.append(link)
@@ -434,6 +453,10 @@ class mnet_node:
 		if (self.opts.get_bootf):
 			self.bootfile = snmpobj.get_val(OID_SYS_BOOT)
 
+		# chassis info (serial, IOS, platform)
+		if (self.opts.get_chassis_info):
+			self._get_chassis_info()
+
 		# reset the get options
 		self.opts.reset()
 		return 1
@@ -453,10 +476,12 @@ class mnet_node:
 			return None
 
 		# cache some common MIB trees
-		self.link_type_vbtbl	= snmpobj.get_bulk(OID_VTP_TRUNK)
+		self.link_type_vbtbl	= snmpobj.get_bulk(OID_TRUNK_VTP)
 		self.lag_vbtbl			= snmpobj.get_bulk(OID_LAG_LACP)
 		self.vlan_vbtbl			= snmpobj.get_bulk(OID_IF_VLAN)
 		self.ifname_vbtbl		= snmpobj.get_bulk(OID_IFNAME)
+		self.trk_allowed_vbtbl  = snmpobj.get_bulk(OID_TRUNK_ALLOW)
+		self.trk_native_vbtbl   = snmpobj.get_bulk(OID_TRUNK_NATIVE)
 		
 		if (self.ifip_vbtbl == None):
 			self.ifip_vbtbl		= snmpobj.get_bulk(OID_IF_IP)
@@ -511,7 +536,15 @@ class mnet_node:
 				rios = rios_s.group(1)
 
 		# get link type (trunk ?)
-		link_type = snmpobj.cache_lookup(self.link_type_vbtbl, OID_VTP_TRUNK + '.' + ifidx)
+		link_type = snmpobj.cache_lookup(self.link_type_vbtbl, OID_TRUNK_VTP + '.' + ifidx)
+
+		native_vlan = None
+		allowed_vlans = 'All'
+		if (link_type == '1'):
+			native_vlan = snmpobj.cache_lookup(self.trk_native_vbtbl, OID_TRUNK_NATIVE + '.' + ifidx)
+
+			allowed_vlans = snmpobj.cache_lookup(self.trk_allowed_vbtbl, OID_TRUNK_ALLOW + '.' + ifidx)
+			allowed_vlans = self._parse_allowed_vlans(allowed_vlans)
 
 		# get LAG membership
 		lag = snmpobj.cache_lookup(self.lag_vbtbl, OID_LAG_LACP + '.' + ifidx)
@@ -523,25 +556,83 @@ class mnet_node:
 		# get IP address
 		lifip = get_ip_from_ifidx(snmpobj, self.ifip_vbtbl, ifidx)
 
-		link = mnet_node_link(link_type		= link_type,
-							vlan			= vlan,
-							local_port		= lport,
-							remote_port		= rport,
-							local_lag		= lag,
-							remote_lag		= None,
-							local_if_ip		= lifip,
-							remote_if_ip	= None,
-							remote_platform = rplat,
-							remote_ios		= rios)
+		link = mnet_node_link(link_type			= link_type,
+							vlan				= vlan,
+							local_native_vlan	= native_vlan,
+							local_allowed_vlans = allowed_vlans,
+							local_port			= lport,
+							remote_port			= rport,
+							local_lag			= lag,
+							remote_lag			= None,
+							local_if_ip			= lifip,
+							remote_if_ip		= None,
+							remote_platform		= rplat,
+							remote_ios			= rios)
 		return link
 
 
-	def get_chassis_info(self):
+	def _parse_allowed_vlans(self, allowed_vlans):
+		if (allowed_vlans.startswith('0x') == False):
+			return 'All'
+	
+		ret = ''
+		group = 0
+		op = 0
+
+		for i in range(2, len(allowed_vlans)):
+			v = int(allowed_vlans[i], 16)
+			for b in range(0, 4):
+				a = v & (0x1 << (3 - b))
+				vlan = ((i-2)*4)+b
+
+				if (a):
+					if (op == 1):
+						group += 1
+					else:
+						if (len(ret)):
+							if (group > 1):
+								ret += '-'
+								ret += str(vlan - 1) if vlan else '1'
+							else:
+								ret += ',%i' % vlan
+						else:
+							ret += str(vlan)
+						group = 0
+						op = 1
+				else:
+					if (op == 0):
+						group += 1
+					else:
+						if (len(ret)):
+							if (group > 1):
+								ret += '-%i' % (vlan - 1)
+						group = 0
+						op = 0
+
+		if (op):
+			if (ret == '1'):
+				return 'All'
+			if (group):
+				ret += '-1001'
+			else:
+				ret += ',1001'
+
+		return ret if len(ret) else 'All'
+
+
+	def _get_chassis_info(self):
+		# Get:
+		#    Serial number
+		#    Platform
+		#    IOS
 		# Slow but reliable method by using SNMP directly.
 		# Usually we will get this via CDP.
 		snmpobj = self.snmpobj
 
 		if ((self.stack.count > 0) | (self.vss.enabled == 1)):
+			# Use opts.get_stack_details
+			# or  opts.get_vss_details
+			# for this.
 			return
 
 		class_vbtbl  = snmpobj.get_bulk(OID_ENTPHYENTRY_CLASS)
