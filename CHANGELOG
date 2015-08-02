@@ -10,6 +10,7 @@ v0.8 -
 	- Internal code changes.
 	- Trunks show native VLAN (if mismatched then both P and C will be displayed)
 	- Trunks show allowed VLANs (if mismatched then both P and C will be displayed) (standard range only)
+	- Added support for LLDP
 
 v0.7 - 7/25/2015
 	graph

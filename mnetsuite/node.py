@@ -29,55 +29,75 @@ from util import *
 import sys
 
 class mnet_node_link:
-	node			= None
-	link_type		= None
-	vlan			= None
-	local_native_vlan		= None
-	local_allowed_vlans		= None
-	remote_native_vlan		= None
-	remote_allowed_vlans	= None
-	local_port		= None
-	remote_port		= None
-	local_lag		= None
-	remote_lag		= None
-	local_if_ip		= None
-	remote_if_ip	= None
-	remote_platform = None
-	remote_ios		= None
+	'''
+	Generic link to another node.
+	CDP and LLDP neighbors are discovered
+	and returned as mnet_node_link objects.
+	'''
+	# the linked node
+	node                  = None
+
+	# description of the link
+	link_type             = None
+	remote_ip             = None
+	remote_name           = None
+	vlan                  = None
+	local_native_vlan     = None
+	local_allowed_vlans   = None
+	remote_native_vlan    = None
+	remote_allowed_vlans  = None
+	local_port            = None
+	remote_port           = None
+	local_lag             = None
+	remote_lag            = None
+	local_if_ip           = None
+	remote_if_ip          = None
+	remote_platform       = None
+	remote_ios            = None
+	remote_mac            = None
+	discovered_proto      = None
 
 	def __init__(
 				self,
-				node					= None,
-				link_type				= None,
-				vlan					= None,
-				local_allowed_vlans		= None,
-				local_native_vlan		= None,
-				remote_allowed_vlans	= None,
-				remote_native_vlan		= None,
-				local_port				= None,
-				remote_port				= None,
-				local_lag				= None,
-				remote_lag				= None,
-				local_if_ip				= None,
-				remote_if_ip			= None,
-				remote_platform			= None,
-				remote_ios				= None
+				node                    = None,
+				link_type               = None,
+				remote_ip               = None,
+				remote_name             = None,
+				vlan                    = None,
+				local_allowed_vlans     = None,
+				local_native_vlan       = None,
+				remote_allowed_vlans    = None,
+				remote_native_vlan      = None,
+				local_port              = None,
+				remote_port             = None,
+				local_lag               = None,
+				remote_lag              = None,
+				local_if_ip             = None,
+				remote_if_ip            = None,
+				remote_platform         = None,
+				remote_ios              = None,
+				remote_mac              = None,
+				discovered_proto        = None
 			):
-		self.node					= node
-		self.link_type				= link_type
-		self.vlan					= vlan
-		self.local_native_vlan		= local_native_vlan
-		self.local_allowed_vlans	= local_allowed_vlans
-		self.remote_native_vlan		= remote_native_vlan
-		self.remote_allowed_vlans	= remote_allowed_vlans
-		self.local_port				= local_port
-		self.remote_port			= remote_port
-		self.local_lag				= local_lag
-		self.remote_lag				= remote_lag
-		self.local_if_ip			= local_if_ip
-		self.remote_if_ip			= remote_if_ip
-		self.remote_platform		= remote_platform
-		self.remote_ios				= remote_ios
+		self.node                       = node
+		self.link_type                  = link_type
+		self.remote_ip                  = remote_ip
+		self.remote_name                = remote_name
+		self.vlan                       = vlan
+		self.local_native_vlan          = local_native_vlan
+		self.local_allowed_vlans        = local_allowed_vlans
+		self.remote_native_vlan         = remote_native_vlan
+		self.remote_allowed_vlans       = remote_allowed_vlans
+		self.local_port                 = local_port
+		self.remote_port                = remote_port
+		self.local_lag                  = local_lag
+		self.remote_lag                 = remote_lag
+		self.local_if_ip                = local_if_ip
+		self.remote_if_ip               = remote_if_ip
+		self.remote_platform            = remote_platform
+		self.remote_ios                 = remote_ios
+		self.remote_mac                 = remote_mac
+		self.discovered_proto           = discovered_proto
 
 
 class mnet_node_svi:
@@ -310,6 +330,8 @@ class mnet_node:
 	vss				= None
 
 	# cached MIB trees
+	cdp_vbtbl		= None
+	lldp_vbtbl		= None
 	link_type_vbtbl	= None
 	lag_vbtbl		= None
 	vlan_vbtbl		= None
@@ -344,14 +366,17 @@ class mnet_node:
 		self.stack = mnet_node_stack()
 		self.vss = mnet_node_vss()
 
-		link_type_vbtbl	= None
-		lag_vbtbl		= None
-		vlan_vbtbl		= None
-		ifname_vbtbl	= None
-		ifip_vbtbl		= None
-		ethif_vbtbl		= None
-		trk_allowed_vbtbl = None
-		trk_native_vbtbl  = None
+		self.cdp_vbtbl          = None
+		self.ldp_vbtbl          = None
+		self.link_type_vbtbl	= None
+		self.lag_vbtbl          = None
+		self.vlan_vbtbl         = None
+		self.ifname_vbtbl       = None
+		self.ifip_vbtbl         = None
+		self.ethif_vbtbl        = None
+		self.trk_allowed_vbtbl  = None
+		self.trk_native_vbtbl   = None
+
 
 	def add_link(self, link):
 		self.links.append(link)
@@ -462,12 +487,35 @@ class mnet_node:
 		return 1
 
 
+	def _cache_common_mibs(self):
+		if (self.link_type_vbtbl == None):
+			self.link_type_vbtbl = self.snmpobj.get_bulk(OID_TRUNK_VTP)
+
+		if (self.lag_vbtbl == None):
+			self.lag_vbtbl = self.snmpobj.get_bulk(OID_LAG_LACP)
+
+		if (self.vlan_vbtbl == None):
+			self.vlan_vbtbl	= self.snmpobj.get_bulk(OID_IF_VLAN)
+
+		if (self.ifname_vbtbl == None):
+			self.ifname_vbtbl = self.snmpobj.get_bulk(OID_IFNAME)
+
+		if (self.trk_allowed_vbtbl == None):
+			self.trk_allowed_vbtbl = self.snmpobj.get_bulk(OID_TRUNK_ALLOW)
+
+		if (self.trk_native_vbtbl == None):
+			self.trk_native_vbtbl = self.snmpobj.get_bulk(OID_TRUNK_NATIVE)
+
+		if (self.ifip_vbtbl == None):
+			self.ifip_vbtbl= self.snmpobj.get_bulk(OID_IF_IP)
+
+
 	#
-	# Get a list of neighbor IP addresses.
-	# Pulled from CDP neighbor table.
+	# Get a list of CDP neighbors.
+	# Returns a list of mnet_node_link's
 	#
-	def get_neighbors(self):
-		children = []
+	def get_cdp_neighbors(self):
+		neighbors = []
 		snmpobj = self.snmpobj
 		
 		# get list of CDP neighbors
@@ -476,16 +524,8 @@ class mnet_node:
 			return None
 
 		# cache some common MIB trees
-		self.link_type_vbtbl	= snmpobj.get_bulk(OID_TRUNK_VTP)
-		self.lag_vbtbl			= snmpobj.get_bulk(OID_LAG_LACP)
-		self.vlan_vbtbl			= snmpobj.get_bulk(OID_IF_VLAN)
-		self.ifname_vbtbl		= snmpobj.get_bulk(OID_IFNAME)
-		self.trk_allowed_vbtbl  = snmpobj.get_bulk(OID_TRUNK_ALLOW)
-		self.trk_native_vbtbl   = snmpobj.get_bulk(OID_TRUNK_NATIVE)
+		self._cache_common_mibs()
 		
-		if (self.ifip_vbtbl == None):
-			self.ifip_vbtbl		= snmpobj.get_bulk(OID_IF_IP)
-
 		for row in self.cdp_vbtbl:
 			for name, val in row:
 				# process only if this row is a CDP_DEVID
@@ -494,46 +534,121 @@ class mnet_node:
 
 				t = name.prettyPrint().split('.')
 				ifidx = t[14]
+				ifidx2 = t[15]
 
 				# get remote IP
-				rip = snmpobj.cache_lookup(self.cdp_vbtbl, OID_CDP_IPADDR + '.' + ifidx + '.' + t[15])
+				rip = snmpobj.cache_lookup(self.cdp_vbtbl, OID_CDP_IPADDR + '.' + ifidx + '.' + ifidx2)
 				rip = convert_ip_int_str(rip)
 
-				# collect CDP info into dict
-				n = {}
-				n['ip'] = rip
-				n['name'] = val.prettyPrint()
-				n['ifidx'] = ifidx
-				n['ifidx2'] = t[15]
+				# get local port
+				lport = get_ifname(snmpobj, self.ifname_vbtbl, ifidx)
 
-				children.append(n)
+				# get remote port
+				rport = snmpobj.cache_lookup(self.cdp_vbtbl, OID_CDP_DEVPORT + '.' + ifidx + '.' + ifidx2)
+				rport = shorten_port_name(rport)
 
-		return children
+				# get remote platform
+				rplat = snmpobj.cache_lookup(self.cdp_vbtbl, OID_CDP_DEVPLAT + '.' + ifidx + '.' + ifidx2)
+
+				# get IOS version
+				rios = snmpobj.cache_lookup(self.cdp_vbtbl, OID_CDP_IOS + '.' + ifidx + '.' + ifidx2)
+				if (rios != None):
+					try:
+						rios = binascii.unhexlify(rios[2:])
+					except:
+						pass
+					rios_s = re.search('Version:? ([^ ,]*)', rios)
+					if (rios_s):
+						rios = rios_s.group(1)
+
+				link                  = self._get_node_link_info(ifidx, ifidx2)
+				link.remote_name      = val.prettyPrint()
+				link.remote_ip        = rip
+				link.discovered_proto = 'cdp'
+				link.local_port       = lport
+				link.remote_port      = rport
+				link.remote_plat      = rplat
+				link.remote_ios       = rios
+
+				neighbors.append(link)
+
+		return neighbors
 
 
-	def get_node_link_info(self, ifidx, ifidx2):
+	#
+	# Get a list of LLDP neighbors.
+	# Returns a list of mnet_node_link's
+	#
+	def get_lldp_neighbors(self):
+		neighbors = []
 		snmpobj = self.snmpobj
+		
+		self.lldp_vbtbl = snmpobj.get_bulk(OID_LLDP)
+		if (self.lldp_vbtbl == None):
+			return None
 
-		# get local port
-		lport = get_ifname(snmpobj, self.ifname_vbtbl, ifidx)
+		self._cache_common_mibs()
+		
+		for row in self.lldp_vbtbl:
+			for name, val in row:
+				if (name.prettyPrint().startswith(OID_LLDP_TYPE) == 0):
+					continue
 
-		# get remote port
-		rport = snmpobj.cache_lookup(self.cdp_vbtbl, OID_CDP_DEVPORT + '.' + ifidx + '.' + ifidx2)
-		rport = shorten_port_name(rport)
+				t = name.prettyPrint().split('.')
+				ifidx = t[12]
+				ifidx2 = t[13]
 
-		# get remote platform
-		rplat = snmpobj.cache_lookup(self.cdp_vbtbl, OID_CDP_DEVPLAT + '.' + ifidx + '.' + ifidx2)
+				rip = ''
+				for r in self.lldp_vbtbl:
+					for	n, v in r:
+						if (n.prettyPrint().startswith(OID_LLDP_DEVADDR + '.' + ifidx + '.' + ifidx2)):
+							t2 = n.prettyPrint().split('.')
+							rip = '.'.join(t2[16:])
 
-		# get IOS version
-		rios = snmpobj.cache_lookup(self.cdp_vbtbl, OID_CDP_IOS + '.' + ifidx + '.' + ifidx2)
-		if (rios != None):
-			try:
-				rios = binascii.unhexlify(rios[2:])
-			except:
-				pass
-			rios_s = re.search('Version:? ([^ ,]*)', rios)
-			if (rios_s):
-				rios = rios_s.group(1)
+
+				lport = get_ifname(snmpobj, self.ifname_vbtbl, ifidx)
+
+				rport = snmpobj.cache_lookup(self.lldp_vbtbl, OID_LLDP_DEVPORT + '.' + ifidx + '.' + ifidx2)
+				rport = shorten_port_name(rport)
+
+				devid = snmpobj.cache_lookup(self.lldp_vbtbl, OID_LLDP_DEVID + '.' + ifidx + '.' + ifidx2)
+				try:
+					mac_seg = [devid[x:x+4] for x in xrange(2, len(devid), 4)]
+					devid = '.'.join(mac_seg)
+				except:
+					pass
+
+				rimg = snmpobj.cache_lookup(self.lldp_vbtbl, OID_LLDP_DEVDESC + '.' + ifidx + '.' + ifidx2)
+				if (rimg != None):
+					try:
+						rimg = binascii.unhexlify(rimg[2:])
+					except:
+						pass
+					rimg_s = re.search('Version:? ([^ ,]*)', rimg)
+					if (rimg_s):
+						rimg = rimg_s.group(1)
+
+				name = snmpobj.cache_lookup(self.lldp_vbtbl, OID_LLDP_DEVNAME + '.' + ifidx + '.' + ifidx2)
+				if ((name == None) | (name == '')):
+					name = devid
+
+				link                  = self._get_node_link_info(ifidx, ifidx2)
+				link.remote_ip        = rip
+				link.remote_name      = name
+				link.discovered_proto = 'lldp'
+				link.local_port       = lport
+				link.remote_port      = rport
+				link.remote_plat      = None
+				link.remote_ios       = rimg
+				link.remote_mac       = devid
+
+				neighbors.append(link)
+
+		return neighbors
+
+
+	def _get_node_link_info(self, ifidx, ifidx2):
+		snmpobj = self.snmpobj
 
 		# get link type (trunk ?)
 		link_type = snmpobj.cache_lookup(self.link_type_vbtbl, OID_TRUNK_VTP + '.' + ifidx)
@@ -556,18 +671,21 @@ class mnet_node:
 		# get IP address
 		lifip = get_ip_from_ifidx(snmpobj, self.ifip_vbtbl, ifidx)
 
-		link = mnet_node_link(link_type			= link_type,
-							vlan				= vlan,
-							local_native_vlan	= native_vlan,
+		link = mnet_node_link(remote_ip         = None,
+							link_type           = link_type,
+							vlan                = vlan,
+							local_native_vlan   = native_vlan,
 							local_allowed_vlans = allowed_vlans,
-							local_port			= lport,
-							remote_port			= rport,
-							local_lag			= lag,
-							remote_lag			= None,
-							local_if_ip			= lifip,
-							remote_if_ip		= None,
-							remote_platform		= rplat,
-							remote_ios			= rios)
+							local_port          = None,
+							remote_port         = None,
+							local_lag           = lag,
+							remote_lag          = None,
+							local_if_ip         = lifip,
+							remote_if_ip        = None,
+							remote_platform     = None,
+							remote_ios          = None,
+							remote_name         = None,
+							discovered_proto    = None)
 		return link
 
 

@@ -4,7 +4,7 @@ MNet Suite
 Michael Laforest `<mjlaforest` *at* `gmail` *dot* `com>`
 
 The MNet Suite is a collection of tools written in Python for network professionals.  
-The tools are centrally focused on Cisco devices.
+The tools are focused on Cisco devices.
 
 # Support
 
@@ -15,7 +15,7 @@ My bitcoin address is: [**`14J9R95Sru4d489W1B4Mk3hh1bWpBV9Rpb`**](https://blockc
 # Suite Tools
 | Module | Description |
 | --- | --- |
-| Graph | Crawls a network and builds a diagram based on CDP neighbor information. |
+| Graph | Crawls a network and builds a diagram based on CDP and LLDP neighbor information. |
 | TraceMAC | Attempts to locate a specific MAC address by recursively looking it up in switch CAM tables. |
 
 # Installing MNet
@@ -135,10 +135,10 @@ The toolset uses a JSON configuration file for common parameters.
 
 ### Details
 
-The graph module starts at a defined root node and recursively traverses neighboring devices (discovered via CDP) until a defined depth is reached.  Data is collected using SNMP.
+The graph module starts at a defined root node and recursively traverses neighboring devices (discovered via CDP and LLDP) until a defined depth is reached.  Data is collected using SNMP.
 
 MNet will attempt to collect the following information and include it in the generated diagram:
-+ All devices (via CDP)
++ All devices (via CDP and LLDP)
 + Interface names
 + IP addresses
 + VLAN memberships
@@ -186,8 +186,8 @@ at node `10.10.0.3`.  The MAC address is found on switch `IDF3_D` on port
 `Gi0/11`.
 
 ```
-# mnet-tracemac.py -r 10.10.0.3 -m 0023.6863.7570
-MNet-TraceMAC v0.1
+# mnet.py tracemac -r 10.10.0.3 -m 0023.6863.7570
+MNet Suite v0.7
 Written by Michael Laforest <mjlaforest@gmail.com>
 
      Config file: ./mnet.conf
@@ -224,6 +224,10 @@ Trace complete.
 **A.** Check out the config options `subnets` and `exclude`.  You can specifically exclude CIDR's if you do not want them included in your diagram.  
   
 In addition, suppose you wanted to prune part of the network off and only display the rest.  You can add the IP addresses of the first node to be pruned to the `exclude` list in the config file (ex: `10.55.102.33/32`), then run mnet graph from the new root node.  As mnet crawls outward and reaches the first node that you pruned, the exclude list will prevent mnet from including it and mnet will not continue crawling in that direction.  
+
+**Q.** `My diagram is still too wide.  What can I do?`  
+  
+**A.** Try to use the Graphviz `unflatted` command line program to reformat the generated dot file.  
   
 **Q.** `Where is the config file?`  
   
