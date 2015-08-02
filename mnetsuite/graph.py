@@ -79,7 +79,7 @@ class mnet_graph:
 
 	def crawl(self, ip):
 		# pull info for this node
-		node = self._get_node(ip, 0)
+		node = self._get_node(ip, 0, 'root')
 		if (node != None):
 			self._crawl_node(node, 0)
 		
@@ -94,7 +94,26 @@ class mnet_graph:
 		return
 
 
-	def _get_node(self, ip, depth):
+	def _print_step(self, ip, name, indicator, depth, discovered_proto, can_connect):
+		if (discovered_proto == 'cdp'):
+			sys.stdout.write('[ cdp]')
+		elif (discovered_proto == 'lldp'):
+			sys.stdout.write('[lldp]')
+		else:
+			sys.stdout.write('      ')
+
+		sys.stdout.write(indicator)
+
+		for i in range(0, depth):
+			sys.stdout.write('.')
+
+		if (can_connect == 1):
+			print('%s (%s)' % (name, ip))
+		else:
+			print('UNKNOWN (%s)            << UNABLE TO CONNECT WITH SNMP' % ip)
+
+
+	def _get_node(self, ip, depth, discovered_proto):
 		node = mnet_node()
 		node.name = 'UNKNOWN'
 		node.ip = [ip]
@@ -102,7 +121,8 @@ class mnet_graph:
 		# vmware ESX reports the IP as 0.0.0.0
 		# return a minimal node since we don't have
 		# a real IP.
-		if (ip == '0.0.0.0'):
+		# LLDP can return an empty string for IPs.
+		if ((ip == '0.0.0.0') | (ip == '')):
 			self.nodes.append(node)
 			return node
 
@@ -115,10 +135,7 @@ class mnet_graph:
 
 		# find valid credentials for this node
 		if (node.try_snmp_creds(self.config.snmp_creds) == 0):
-			sys.stdout.write('+')
-			for i in range(0, depth):
-				sys.stdout.write('.')
-			print('UNKNOWN (%s)            << UNABLE TO CONNECT WITH SNMP' % ip)
+			self._print_step(ip, None, '+', depth, discovered_proto, 0)
 			self.nodes.append(node)
 			return node
 
@@ -135,10 +152,7 @@ class mnet_graph:
 				return ex
 
 		# print some info to stdout
-		sys.stdout.write('+')
-		for i in range(0, depth):
-			sys.stdout.write('.')
-		print('%s (%s)' % (node.name, ip))
+		self._print_step(ip, node.name, '+', depth, discovered_proto, 1)
 
 		node.opts.get_router = True
 		node.opts.get_ospf_id = True
@@ -185,10 +199,7 @@ class mnet_graph:
 			return
 
 		# print some info to stdout
-		sys.stdout.write('>')
-		for i in range(0, depth):
-			sys.stdout.write('.')
-		print('%s (%s)' % (node.name, node.ip[0]))
+		self._print_step(node.ip[0], node.name, '>', depth, '', 1)
 
 		# get the cached snmp credentials
 		snmpobj = node.snmpobj
@@ -197,37 +208,37 @@ class mnet_graph:
 		valid_neighbors = []
 
 		# get list of CDP neighbors
-		neighbors = node.get_neighbors()
-		if (neighbors == None):
+		cdp_neighbors = node.get_cdp_neighbors()
+
+		# get list of LLDP neighbors
+		lldp_neighbors = node.get_lldp_neighbors()
+
+		if ((cdp_neighbors == None) & (lldp_neighbors == None)):
 			return
 
-		for neighbor in neighbors:
-			rip = neighbor['ip']
-			rname = neighbor['name']
-			ifidx = neighbor['ifidx']
-			ifidx2 = neighbor['ifidx2']
+		neighbors = cdp_neighbors + lldp_neighbors
 
+		for n in neighbors:
 			# if the remote IP is not allowed, stop processing it here
-			if (self.is_node_allowed(rip) == 0):
+			if (self.is_node_allowed(n.remote_ip) == 0):
 				continue
 
-			link = node.get_node_link_info(ifidx, ifidx2)
-
 			# get the child info
-			if (rip != 'UNKNOWN'):
-				child = self._get_node(rip, depth+1)
+			if (n.remote_ip != 'UNKNOWN'):
+				child = self._get_node(n.remote_ip, depth+1, n.discovered_proto)
 				if (child != None):
 					# if we couldn't pull info from SNMP fill in what we know
 					if (child.snmpobj.success == 0):
-						child.name = shorten_host_name(rname, self.config.host_domains)
+						child.name = shorten_host_name(n.remote_name, self.config.host_domains)
+						self._print_step(n.remote_ip, n.remote_name, '+', depth, n.discovered_proto, 1)
 
-					# CDP advertises the platform
-					child.plat = link.remote_platform
-					child.ios = link.remote_ios
+					# CDP/LLDP advertises the platform
+					child.plat = n.remote_platform
+					child.ios = n.remote_ios
 
 					# link child to parent
-					link.node = child
-					self.add_link(node, link)
+					n.node = child
+					self.add_link(node, n)
 					valid_neighbors.append(child)
 
 		# crawl the valid neighbors
@@ -239,7 +250,7 @@ class mnet_graph:
 	# Returns 1 if the IP is allowed to be crawled.
 	#
 	def is_node_allowed(self, ip):
-		if (ip == 'UNKNOWN'):
+		if ((ip == 'UNKNOWN') | (ip == '')):
 			return 1
 
 		ipaddr = None
@@ -393,9 +404,10 @@ class mnet_graph:
 		dot_node.peripheries = 1
 		dot_node.label = ''
 
-		dot_node.label = '<font point-size="10"><b>%s</b></font><br />' \
-						'<font point-size="8"><i>%s</i></font>' \
-						% (node.name, node.ip[0])
+		dot_node.label = '<font point-size="10"><b>%s</b></font>' % node.name
+
+		if (node.ip[0] != ''):
+			dot_node.label += '<br /><font point-size="8"><i>%s</i></font>' % node.ip[0]
 
 		if ((node.stack.count == 0) | (self.config.graph.get_stack_members == 0)):
 			# show platform here or break it down by stack/vss later
