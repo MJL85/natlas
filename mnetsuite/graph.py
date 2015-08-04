@@ -216,14 +216,7 @@ class mnet_graph:
 		if ((cdp_neighbors == None) & (lldp_neighbors == None)):
 			return
 
-		#neighbors = cdp_neighbors + lldp_neighbors
-		neighbors = []
-		for cdpn in cdp_neighbors:
-			if (self._is_link_in_list(cdpn, neighbors) == 0):
-				neighbors.append(cdpn)
-		for lldpn in lldp_neighbors:
-			if (self._is_link_in_list(lldpn, neighbors) == 0):
-				neighbors.append(lldpn)
+		neighbors = cdp_neighbors + lldp_neighbors
 
 		for n in neighbors:
 			# if the remote IP is not allowed, stop processing it here
@@ -245,19 +238,12 @@ class mnet_graph:
 
 					# link child to parent
 					n.node = child
-					self.add_link(node, n)
-					valid_neighbors.append(child)
+					if (self.add_link(node, n) == 1):
+						valid_neighbors.append(child)
 
 		# crawl the valid neighbors
 		for n in valid_neighbors:
 			self._crawl_node(n, depth+1)
-
-
-	def _is_link_in_list(self, node, neighbor_list):
-		for n in neighbor_list:
-			if ((n.remote_name == node.remote_name) & (n.local_port == node.local_port)):
-				return 1
-		return 0
 
 
 	#
@@ -295,6 +281,12 @@ class mnet_graph:
 		return 0
 
 
+	#
+	# Add or update a link.
+	# Return
+	#    0 - Found an existing link and updated it
+	#    1 - Added as a new link
+	#
 	def add_link(self, node, link):
 		if (link.node.crawled == 1):
 			# both nodes have been crawled,
@@ -320,10 +312,17 @@ class mnet_graph:
 
 							if ((link.local_allowed_vlans != None) & (ex_link.remote_allowed_vlans == None)):
 								ex_link.remote_allowed_vlans = link.local_allowed_vlans
-							return
+
+							return 0
+		else:
+			for ex_link in node.links:
+				if ((ex_link.node.name == link.node.name) & (ex_link.local_port == link.local_port)):
+					# haven't crawled yet but somehow we have this link twice.
+					# maybe from different discovery processes?
+					return 0
 
 		node.add_link(link)
-		return
+		return 1
 
 
 	def _output_stdout(self, node):
