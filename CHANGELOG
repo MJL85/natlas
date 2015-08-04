@@ -11,6 +11,8 @@ v0.8 -
 	- Trunks show native VLAN (if mismatched then both P and C will be displayed)
 	- Trunks show allowed VLANs (if mismatched then both P and C will be displayed) (standard range only)
 	- Added support for LLDP
+	- Renamed config option "collapse_stackwise" to "expand_stackwise"
+	- Renamed config option "collapse_vss" to "expand_vss"
 
 v0.7 - 7/25/2015
 	graph

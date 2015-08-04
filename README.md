@@ -101,8 +101,8 @@ The toolset uses a JSON configuration file for common parameters.
 		"include_serials": 0,
 		"get_stack_members" : 0,
 		"get_vss_members" : 0,
-		"collapse_stackwise" : 1,
-		"collapse_vss" : 1
+		"expand_stackwise" : 0,
+		"expand_vss" : 0
         }
 	
 }
@@ -128,8 +128,9 @@ The toolset uses a JSON configuration file for common parameters.
 | `include_serials` | bool | `0` | If set to `1`, nodes will include serial numbers. |
 | `get_stack_members` | bool | `0` | If set to `1`, nodes will include details about stackwise members. |
 | `get_vss_members` | bool | `0` | If set to `1`, nodes will include details about VSS members. |
-| `collapse_stackwise` | bool | `1` | If set to `0`, nodes belonging to stackwise groups will be expanded to show each member as a node. |
-| `collapse_vss` | bool | `1` | If set to `0`, nodes belonging to VSS groups will be expanded to show each member as a node. |
+| `expand_stackwise` | bool | `0` | If set to `1`, nodes belonging to stackwise groups will be expanded to show each member as a node. |
+| `expand_vss` | bool | `0` | If set to `1`, nodes belonging to VSS groups will be expanded to show each member as a node. |
+| `expand_lag` | bool | `1` | If set to `1`, each link between nodes will be shown.  If set to `0`, links of the same logical link channel will be grouped and only the channel link will be shown. |
 
 # MNet's Graph Module
 

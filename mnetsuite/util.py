@@ -38,46 +38,6 @@ if (USE_NETADDR == 1):
 	from netaddr import IPAddress, IPNetwork
 
 
-#
-# Lookup and format an interface name from a cache table of indexes.
-#
-def get_ifname(snmpobj, ifname_tbl, ifidx):
-	if ((ifidx == None) | (ifidx == OID_ERR)):
-		return 'UNKNOWN'
-
-	str = snmpobj.cache_lookup(ifname_tbl, OID_IFNAME + '.' + ifidx)
-	str = shorten_port_name(str)
-
-	return str or 'UNKNOWN'
-
-
-#
-# Lookup the IP address from the interface index in the cache table.
-#
-def get_ip_from_ifidx(snmpobj, ifip_tbl, ifidx):
-	if ((ifip_tbl == None) | (ifidx == None) | (ifidx == OID_ERR)):
-		return 'UNKNOWN'
-
-	for row in ifip_tbl:
-		for name, val in row:
-			if (str(val) != str(ifidx)):
-				continue
-
-			t = name.prettyPrint().split('.')
-			ip = '%s.%s.%s.%s' % (t[10], t[11], t[12], t[13])
-
-			netm = snmpobj.cache_lookup(ifip_tbl, OID_IF_IP_NETM + ip)
-
-			# layer 3 unnumbered interface
-			if (netm == None):
-				return 'Unnumbered'
-
-			cidr = get_net_bits_from_mask(netm)
-			return '%s/%i' % (ip, cidr)
-
-	return 'UNKNOWN'
-
-
 def get_net_bits_from_mask(netm):
 	cidr = 0
 

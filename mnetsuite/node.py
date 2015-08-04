@@ -50,6 +50,8 @@ class mnet_node_link:
 	remote_port           = None
 	local_lag             = None
 	remote_lag            = None
+	local_lag_ips         = []
+	remote_lag_ips        = []
 	local_if_ip           = None
 	remote_if_ip          = None
 	remote_platform       = None
@@ -72,6 +74,8 @@ class mnet_node_link:
 				remote_port             = None,
 				local_lag               = None,
 				remote_lag              = None,
+				local_lag_ips           = [],
+				remote_lag_ips          = [],
 				local_if_ip             = None,
 				remote_if_ip            = None,
 				remote_platform         = None,
@@ -92,6 +96,8 @@ class mnet_node_link:
 		self.remote_port                = remote_port
 		self.local_lag                  = local_lag
 		self.remote_lag                 = remote_lag
+		self.local_lag_ips              = local_lag_ips
+		self.remote_lag_ips             = remote_lag_ips
 		self.local_if_ip                = local_if_ip
 		self.remote_if_ip               = remote_if_ip
 		self.remote_platform            = remote_platform
@@ -111,11 +117,11 @@ class mnet_node_svi:
 
 class mnet_node_lo:
 	name = None
-	ip = None
+	ips = []
 
-	def __init__(self, name, ip):
+	def __init__(self, name, ips):
 		self.name = name.replace('Loopback', 'lo')
-		self.ip = ip
+		self.ips = ips
 
 
 class mnet_node_stack_member:
@@ -337,6 +343,7 @@ class mnet_node:
 	vlan_vbtbl		= None
 	ifname_vbtbl	= None
 	ifip_vbtbl		= None
+	svi_vbtbl       = None
 	ethif_vbtbl		= None
 	trk_allowed_vbtbl = None
 	trk_native_vbtbl  = None
@@ -373,6 +380,7 @@ class mnet_node:
 		self.vlan_vbtbl         = None
 		self.ifname_vbtbl       = None
 		self.ifip_vbtbl         = None
+		self.svi_vbtbl          = None
 		self.ethif_vbtbl        = None
 		self.trk_allowed_vbtbl  = None
 		self.trk_native_vbtbl   = None
@@ -438,24 +446,18 @@ class mnet_node:
 
 		# SVI
 		if (self.opts.get_svi == True):
-			self.svi_vbtbl		= snmpobj.get_bulk(OID_SVI_VLANIF)
-			self.ifip_vbtbl		= snmpobj.get_bulk(OID_IF_IP)
+			if (self.svi_vbtbl == None):
+				self.svi_vbtbl		= snmpobj.get_bulk(OID_SVI_VLANIF)
+
+			if (self.ifip_vbtbl == None):
+				self.ifip_vbtbl		= snmpobj.get_bulk(OID_IF_IP)
 
 			for row in self.svi_vbtbl:
 				for n, v in row:
 					vlan = n.prettyPrint().split('.')[14]
 					svi = mnet_node_svi(vlan)
-					for ifrow in self.ifip_vbtbl:
-						for ifn, ifv in ifrow:
-							if (ifn.prettyPrint().startswith(OID_IF_IP_ADDR)):
-								if (v == ifv):
-									t = ifn.prettyPrint().split('.')
-									svi_ip = ".".join(t[10:])
-									mask = snmpobj.cache_lookup(self.ifip_vbtbl, OID_IF_IP_NETM + svi_ip)
-									nbits = get_net_bits_from_mask(mask)
-									svi_ip = '%s/%i' % (svi_ip, nbits)
-									svi.ip.append(svi_ip)
-
+					svi_ips = self._get_cidrs_from_ifidx(v)
+					svi.ip.extend(svi_ips)
 					self.svis.append(svi)
 
 		# loopback
@@ -470,8 +472,8 @@ class mnet_node:
 					if (n.prettyPrint().startswith(OID_ETH_IF_TYPE) & (v == 24)):
 						ifidx = n.prettyPrint().split('.')[10]
 						lo_name = snmpobj.cache_lookup(self.ethif_vbtbl, OID_ETH_IF_DESC + '.' + ifidx)
-						lo_ip = get_ip_from_ifidx(snmpobj, self.ifip_vbtbl, ifidx)
-						lo = mnet_node_lo(lo_name, lo_ip) 
+						lo_ips = self._get_cidrs_from_ifidx(ifidx)
+						lo = mnet_node_lo(lo_name, lo_ips) 
 						self.loopbacks.append(lo)
 
 		# bootfile
@@ -485,6 +487,22 @@ class mnet_node:
 		# reset the get options
 		self.opts.reset()
 		return 1
+
+
+	def _get_cidrs_from_ifidx(self, ifidx):
+		ips = []
+
+		for ifrow in self.ifip_vbtbl:
+			for ifn, ifv in ifrow:
+				if (ifn.prettyPrint().startswith(OID_IF_IP_ADDR)):
+					if (str(ifv) == str(ifidx)):
+						t = ifn.prettyPrint().split('.')
+						ip = ".".join(t[10:])
+						mask = self.snmpobj.cache_lookup(self.ifip_vbtbl, OID_IF_IP_NETM + ip)
+						nbits = get_net_bits_from_mask(mask)
+						cidr = '%s/%i' % (ip, nbits)
+						ips.append(cidr)
+		return ips
 
 
 	def _cache_common_mibs(self):
@@ -507,7 +525,7 @@ class mnet_node:
 			self.trk_native_vbtbl = self.snmpobj.get_bulk(OID_TRUNK_NATIVE)
 
 		if (self.ifip_vbtbl == None):
-			self.ifip_vbtbl= self.snmpobj.get_bulk(OID_IF_IP)
+			self.ifip_vbtbl = self.snmpobj.get_bulk(OID_IF_IP)
 
 
 	#
@@ -541,7 +559,7 @@ class mnet_node:
 				rip = convert_ip_int_str(rip)
 
 				# get local port
-				lport = get_ifname(snmpobj, self.ifname_vbtbl, ifidx)
+				lport = self._get_ifname(ifidx)
 
 				# get remote port
 				rport = snmpobj.cache_lookup(self.cdp_vbtbl, OID_CDP_DEVPORT + '.' + ifidx + '.' + ifidx2)
@@ -606,7 +624,7 @@ class mnet_node:
 							rip = '.'.join(t2[16:])
 
 
-				lport = get_ifname(snmpobj, self.ifname_vbtbl, ifidx)
+				lport = self._get_ifname(ifidx)
 
 				rport = snmpobj.cache_lookup(self.lldp_vbtbl, OID_LLDP_DEVPORT + '.' + ifidx + '.' + ifidx2)
 				rport = shorten_port_name(rport)
@@ -663,13 +681,14 @@ class mnet_node:
 
 		# get LAG membership
 		lag = snmpobj.cache_lookup(self.lag_vbtbl, OID_LAG_LACP + '.' + ifidx)
-		lag = get_ifname(snmpobj, self.ifname_vbtbl, lag)
+		lag_ifname = self._get_ifname(lag)
+		lag_ips = self._get_cidrs_from_ifidx(lag)
 
 		# get VLAN info
 		vlan = snmpobj.cache_lookup(self.vlan_vbtbl, OID_IF_VLAN + '.' + ifidx)
 
 		# get IP address
-		lifip = get_ip_from_ifidx(snmpobj, self.ifip_vbtbl, ifidx)
+		lifips = self._get_cidrs_from_ifidx(ifidx)
 
 		link = mnet_node_link(remote_ip         = None,
 							link_type           = link_type,
@@ -678,9 +697,11 @@ class mnet_node:
 							local_allowed_vlans = allowed_vlans,
 							local_port          = None,
 							remote_port         = None,
-							local_lag           = lag,
+							local_lag           = lag_ifname,
 							remote_lag          = None,
-							local_if_ip         = lifip,
+							local_lag_ips       = lag_ips,
+							remote_lag_ips      = [],
+							local_if_ip         = lifips[0] if len(lifips) else None,
 							remote_if_ip        = None,
 							remote_platform     = None,
 							remote_ios          = None,
@@ -791,7 +812,19 @@ class mnet_node:
 					break
 		return
 
+	#
+	# Lookup and format an interface name from a cache table of indexes.
+	#
+	def _get_ifname(self, ifidx):
+		if ((ifidx == None) | (ifidx == OID_ERR)):
+			return 'UNKNOWN'
 
-	def get_system_name(self, domains):
+		str = self.snmpobj.cache_lookup(self.ifname_vbtbl, OID_IFNAME + '.' + ifidx)
+		str = shorten_port_name(str)
+
+		return str or 'UNKNOWN'
+
+
+	def _get_system_name(self, domains):
 		return shorten_host_name(self.snmpobj.get_val(OID_SYSNAME), domains)
 
