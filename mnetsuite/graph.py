@@ -139,7 +139,7 @@ class mnet_graph:
 			self.nodes.append(node)
 			return node
 
-		node.name = node.get_system_name(self.config.host_domains)
+		node.name = node._get_system_name(self.config.host_domains)
 
 		# verify this node isn't already in our visited
 		# list by checking for its hostname
@@ -216,7 +216,14 @@ class mnet_graph:
 		if ((cdp_neighbors == None) & (lldp_neighbors == None)):
 			return
 
-		neighbors = cdp_neighbors + lldp_neighbors
+		#neighbors = cdp_neighbors + lldp_neighbors
+		neighbors = []
+		for cdpn in cdp_neighbors:
+			if (self._is_link_in_list(cdpn, neighbors) == 0):
+				neighbors.append(cdpn)
+		for lldpn in lldp_neighbors:
+			if (self._is_link_in_list(lldpn, neighbors) == 0):
+				neighbors.append(lldpn)
 
 		for n in neighbors:
 			# if the remote IP is not allowed, stop processing it here
@@ -244,6 +251,17 @@ class mnet_graph:
 		# crawl the valid neighbors
 		for n in valid_neighbors:
 			self._crawl_node(n, depth+1)
+
+
+	def _is_link_in_list(self, node, neighbor_list):
+		print('checking [%s]' % node.remote_name)
+		for n in neighbor_list:
+			print(' ? [%s]' % n.remote_name)
+			if ((n.remote_name == node.remote_name) & (n.local_port == node.local_port)):
+				print(' match')
+				return 1
+		print(' no match')
+		return 0
 
 
 	#
@@ -294,10 +312,16 @@ class mnet_graph:
 						if ((ex_link.node.name == node.name) & (ex_link.local_port == link.remote_port)):
 							if ((link.local_if_ip != 'UNKNOWN') & (ex_link.remote_if_ip == None)):
 								ex_link.remote_if_ip = link.local_if_ip
+
 							if ((link.local_lag != 'UNKNOWN') & (ex_link.remote_lag == None)):
 								ex_link.remote_lag = link.local_lag
+
+							if ((len(link.local_lag_ips) == 0) & len(ex_link.remote_lag_ips)):
+								ex_link.remote_lag_ips = link.local_lag_ips
+
 							if ((link.local_native_vlan != None) & (ex_link.remote_native_vlan == None)):
 								ex_link.remote_native_vlan = link.local_native_vlan
+
 							if ((link.local_allowed_vlans != None) & (ex_link.remote_allowed_vlans == None)):
 								ex_link.remote_allowed_vlans = link.local_allowed_vlans
 							return
@@ -361,7 +385,8 @@ class mnet_graph:
 			print('        Not configured.')
 		else:
 			for lo in node.loopbacks:
-				print('        %s - %s' % (lo.name, lo.ip))
+				for lo_ip in lo.ips:
+					print('        %s - %s' % (lo.name, lo_ip))
 				
 		print('      SVIs:')
 		if (self.config.graph.include_svi == False):
@@ -373,7 +398,10 @@ class mnet_graph:
 
 		print('     Links:')
 		for link in node.links:
-			print('       %s -> %s:%s' % (link.local_port, link.node.name, link.remote_port))
+			lag = ''
+			if ((link.local_lag != None) | (link.remote_lag != None)):
+				lag = 'LAG[%s:%s]' % (link.local_lag or '', link.remote_lag or '')
+			print('       %s -> %s:%s %s' % (link.local_port, link.node.name, link.remote_port, lag))
 			ret_links += 1
 
 		for link in node.links:
@@ -419,7 +447,7 @@ class mnet_graph:
 		dot_node.label += '<br />%s' % node.ios
 		
 		if (node.vss.enabled == 1):
-			if (self.config.graph.collapse_vss == 0):
+			if (self.config.graph.expand_vss == 1):
 				dot_node.ntype = 'vss'
 			else:
 				# group VSS into one graph node
@@ -435,7 +463,7 @@ class mnet_graph:
 				dot_node.label += '<br />VSS 1 - %s%s' % (node.vss.members[1].plat, s2)
 
 		if (node.stack.count > 0):
-			if (self.config.graph.collapse_stackwise == 0):
+			if (self.config.graph.expand_stackwise == 1):
 				dot_node.ntype = 'stackwise'
 			else:
 				# group Stackwise into one graph node
@@ -462,7 +490,8 @@ class mnet_graph:
 
 		if (self.config.graph.include_lo == True):
 			for lo in node.loopbacks:
-				dot_node.label += '<br />%s - %s' % (lo.name, lo.ip)
+				for lo_ip in lo.ips:
+					dot_node.label += '<br />%s - %s' % (lo.name, lo_ip)
 
 		if (self.config.graph.include_svi == True):
 			for svi in node.svis:
@@ -545,77 +574,134 @@ class mnet_graph:
 				)
 			graph.add_subgraph(cluster)
 
-
-
+		lags = []
 		for link in node.links:
 			self._output_dot(graph, link.node)
 
-			link_color = 'black'
-			link_style = 'solid'
+			if ((self.config.graph.expand_lag == 1) | (link.local_lag == 'UNKNOWN')):
+				self._output_dot_link(graph, node, link, 0)
+			else:
+				found = 0
+				for lag in lags:
+					if (link.local_lag == lag):
+						found = 1
+						break
+				if (found == 0):
+					lags.append(link.local_lag)
+					self._output_dot_link(graph, node, link, 1)
 
+
+	def _output_dot_link(self, graph, node, link, draw_as_lag):
+		link_color = 'black'
+		link_style = 'solid'
+
+		if (draw_as_lag):
+			link_label = 'LAG'
+			members = 0
+			for l in node.links:
+				if (l.local_lag == link.local_lag):
+					members += 1
+			link_label += '\n%i Members' % members
+		else:
 			link_label = 'P:%s\nC:%s' % (link.local_port, link.remote_port)
 
-			# LAG
-			if (link.local_lag != 'UNKNOWN'):
-				link_label += '\nP:%s | C:%s' % (link.local_lag, link.remote_lag)
+		is_lag = 1 if (link.local_lag != 'UNKNOWN') else 0
+
+		if (draw_as_lag == 0):
+			# LAG as member
+			if (is_lag):
+				local_lag_ip = ''
+				remote_lag_ip = ''
+				if (len(link.local_lag_ips)):
+					local_lag_ip = ' - %s' % link.local_lag_ips[0]
+				if (len(link.remote_lag_ips)):
+					remote_lag_ip = ' - %s' % link.remote_lag_ips[0]
+
+				link_label += '\nLAG Member'
+
+				if ((local_lag_ip == '') & (remote_lag_ip == '')):
+					link_label += '\nP:%s | C:%s' % (link.local_lag, link.remote_lag)
+				else:
+					link_label += '\nP:%s%s' % (link.local_lag, local_lag_ip)
+					link_label += '\nC:%s%s' % (link.remote_lag, remote_lag_ip)
 
 			# IP Addresses
 			if ((link.local_if_ip != 'UNKNOWN') & (link.local_if_ip != None)):
 				link_label += '\nP:%s' % link.local_if_ip
 			if ((link.remote_if_ip != 'UNKNOWN') & (link.remote_if_ip != None)):
 				link_label += '\nC:%s' % link.remote_if_ip
-					
-			if (link.link_type == '1'):
-				# Trunk = Bold/Blue
-				link_color = 'blue'
-				link_style = 'bold'
+		else:
+			# LAG as grouping
+			for l in node.links:
+				if (l.local_lag == link.local_lag):
+					link_label += '\nP:%s | C:%s' % (l.local_port, l.remote_port)
 
-				if ((link.local_native_vlan == link.remote_native_vlan) | (link.remote_native_vlan == None)):
-					link_label += '\nNative %s' % link.local_native_vlan
-				else:
-					link_label += '\nNative P:%s C:%s' % (link.local_native_vlan, link.remote_native_vlan)
+			local_lag_ip = ''
+			remote_lag_ip = ''
 
-				if (link.local_allowed_vlans == link.remote_allowed_vlans):
-					link_label += '\nAllowed %s' % link.local_allowed_vlans
-				else:
-					link_label += '\nAllowed P:%s' % link.local_allowed_vlans
-					if (link.remote_allowed_vlans != None):
-						link_label += '\nAllowed C:%s' % link.remote_allowed_vlans
-			elif (link.link_type is None):
-				# Routed = Bold/Red
-				link_color = 'red'
-				link_style = 'bold'
+			if (len(link.local_lag_ips)):
+				local_lag_ip = ' - %s' % link.local_lag_ips[0]
+			if (len(link.remote_lag_ips)):
+				remote_lag_ip = ' - %s' % link.remote_lag_ips[0]
+
+			if ((local_lag_ip == '') & (remote_lag_ip == '')):
+				link_label += '\nP:%s | C:%s' % (link.local_lag, link.remote_lag)
 			else:
-				# Switched access, include VLAN ID in label
-				if (link.vlan != None):
-					link_label += '\nVLAN %s' % link.vlan
+				link_label += '\nP:%s%s' % (link.local_lag, local_lag_ip)
+				link_label += '\nC:%s%s' % (link.remote_lag, remote_lag_ip)
+			
+				
+		if (link.link_type == '1'):
+			# Trunk = Bold/Blue
+			link_color = 'blue'
+			link_style = 'bold'
 
-			edge_src = node.name
-			edge_dst = link.node.name
-			lmod = get_module_from_interf(link.local_port)
-			rmod = get_module_from_interf(link.remote_port)
+			if ((link.local_native_vlan == link.remote_native_vlan) | (link.remote_native_vlan == None)):
+				link_label += '\nNative %s' % link.local_native_vlan
+			else:
+				link_label += '\nNative P:%s C:%s' % (link.local_native_vlan, link.remote_native_vlan)
 
-			if (self.config.graph.collapse_vss == 0):
-				if (node.vss.enabled == 1):
-					edge_src = '%s[mnetVSS%s]' % (node.name, lmod)
-				if (link.node.vss.enabled == 1):
-					edge_dst = '%s[mnetVSS%s]' % (link.node.name, rmod)
+			if (link.local_allowed_vlans == link.remote_allowed_vlans):
+				link_label += '\nAllowed %s' % link.local_allowed_vlans
+			else:
+				link_label += '\nAllowed P:%s' % link.local_allowed_vlans
+				if (link.remote_allowed_vlans != None):
+					link_label += '\nAllowed C:%s' % link.remote_allowed_vlans
+		elif (link.link_type is None):
+			# Routed = Bold/Red
+			link_color = 'red'
+			link_style = 'bold'
+		else:
+			# Switched access, include VLAN ID in label
+			if (link.vlan != None):
+				link_label += '\nVLAN %s' % link.vlan
 
-			if (self.config.graph.collapse_stackwise == 0):
-				if (node.stack.count > 0):
-					edge_src = '%s[mnetSW%s]' % (node.name, lmod)
-				if (link.node.stack.count > 0):
-					edge_dst = '%s[mnetSW%s]' % (link.node.name, rmod)
+		edge_src = node.name
+		edge_dst = link.node.name
+		lmod = get_module_from_interf(link.local_port)
+		rmod = get_module_from_interf(link.remote_port)
 
-			edge = pydot.Edge(
-						edge_src, edge_dst,
-						dir = 'forward',
-						label = link_label,
-						color = link_color,
-						style = link_style
-					)
+		if (self.config.graph.expand_vss == 1):
+			if (node.vss.enabled == 1):
+				edge_src = '%s[mnetVSS%s]' % (node.name, lmod)
+			if (link.node.vss.enabled == 1):
+				edge_dst = '%s[mnetVSS%s]' % (link.node.name, rmod)
 
-			graph.add_edge(edge)
+		if (self.config.graph.expand_stackwise == 1):
+			if (node.stack.count > 0):
+				edge_src = '%s[mnetSW%s]' % (node.name, lmod)
+			if (link.node.stack.count > 0):
+				edge_dst = '%s[mnetSW%s]' % (link.node.name, rmod)
+
+		edge = pydot.Edge(
+					edge_src, edge_dst,
+					dir = 'forward',
+					label = link_label,
+					color = link_color,
+					style = link_style
+				)
+
+		graph.add_edge(edge)
 
 
 

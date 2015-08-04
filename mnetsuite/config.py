@@ -35,8 +35,9 @@ class mnet_config_graph:
 	include_serials = False
 	get_stack_members = False
 	get_vss_members = False
-	collapse_stackwise = True
-	collapse_vss = True
+	expand_stackwise = False
+	expand_vss = False
+	expand_lag = True
 
 class mnet_config:
 	host_domains	= []
@@ -73,8 +74,9 @@ class mnet_config:
 			self.graph.include_serials    = json_graph.get('include_serials', False)
 			self.graph.get_stack_members  = json_graph.get('get_stack_members', False)
 			self.graph.get_vss_members    = json_graph.get('get_vss_members', False)
-			self.graph.collapse_stackwise = json_graph.get('collapse_stackwise', True)
-			self.graph.collapse_vss       = json_graph.get('collapse_vss', True)
+			self.graph.expand_stackwise   = json_graph.get('expand_stackwise', False)
+			self.graph.expand_vss         = json_graph.get('expand_vss', False)
+			self.graph.expand_lag         = json_graph.get('expand_lag', True)
 
 		return 1
 
@@ -116,8 +118,9 @@ class mnet_config:
 				'		"include_serials" : 0,\n' \
 				'		"get_stack_members" : 0,\n' \
 				'		"get_vss_members" : 0,\n' \
-				'		"collapse_stackwise" : 1,\n' \
-				'		"collapse_vss" : 1\n' \
+				'		"expand_stackwise" : 0,\n' \
+				'		"expand_vss" : 0,\n' \
+				'		"expand_lag" : 1\n' \
 				'	}\n' \
 				'}'
 
