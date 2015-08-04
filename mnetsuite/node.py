@@ -642,9 +642,7 @@ class mnet_node:
 						rimg = binascii.unhexlify(rimg[2:])
 					except:
 						pass
-					rimg_s = re.search('Version:? ([^ ,]*)', rimg)
-					if (rimg_s):
-						rimg = rimg_s.group(1)
+					rimg = self._format_ios_ver(rimg)
 
 				name = snmpobj.cache_lookup(self.lldp_vbtbl, OID_LLDP_DEVNAME + '.' + ifidx + '.' + ifidx2)
 				if ((name == None) | (name == '')):
@@ -810,6 +808,8 @@ class mnet_node:
 
 				if (self.ios != ''):
 					break
+		self.ios = self._format_ios_ver(self.ios)
+
 		return
 
 	#
@@ -827,4 +827,11 @@ class mnet_node:
 
 	def _get_system_name(self, domains):
 		return shorten_host_name(self.snmpobj.get_val(OID_SYSNAME), domains)
+
+
+	def _format_ios_ver(self, img):
+		img_s = re.search('Version:? ([^ ,]*)', img)
+		if (img_s):
+			return img_s.group(1)
+		return img
 
