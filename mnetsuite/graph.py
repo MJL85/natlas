@@ -254,13 +254,9 @@ class mnet_graph:
 
 
 	def _is_link_in_list(self, node, neighbor_list):
-		print('checking [%s]' % node.remote_name)
 		for n in neighbor_list:
-			print(' ? [%s]' % n.remote_name)
 			if ((n.remote_name == node.remote_name) & (n.local_port == node.local_port)):
-				print(' match')
 				return 1
-		print(' no match')
 		return 0
 
 
