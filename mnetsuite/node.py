@@ -575,9 +575,7 @@ class mnet_node:
 						rios = binascii.unhexlify(rios[2:])
 					except:
 						pass
-					rios_s = re.search('Version:? ([^ ,]*)', rios)
-					if (rios_s):
-						rios = rios_s.group(1)
+					rios = self._format_ios_ver(rios)
 
 				link                  = self._get_node_link_info(ifidx, ifidx2)
 				link.remote_name      = val.prettyPrint()
@@ -830,8 +828,11 @@ class mnet_node:
 
 
 	def _format_ios_ver(self, img):
-		img_s = re.search('Version:? ([^ ,]*)', img)
+		img_s = re.search('(Version:? |CCM:)([^ ,$]*)', img)
 		if (img_s):
-			return img_s.group(1)
+			if (img_s.group(1) == 'CCM:'):
+				return 'CCM %s' % img_s.group(2)
+			return img_s.group(2)
+
 		return img
 
