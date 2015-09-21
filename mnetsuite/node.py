@@ -735,14 +735,12 @@ class mnet_node:
 						group = 0
 						op = 1
 				else:
-					if (op == 0):
-						group += 1
-					else:
+					if (op == 1):
 						if (len(ret)):
 							if (group > 1):
 								ret += '-%i' % (vlan - 1)
-						group = 0
 						op = 0
+					group = 0
 
 		if (op):
 			if (ret == '1'):
