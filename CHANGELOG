@@ -6,6 +6,10 @@ mjlaforest@gmail.com
 CHANGE LOG
 --------------------
 
+v0.9 -
+	graph
+	- Fixed bug with allowed VLAN lists not showing correct ranges.
+
 v0.8 - 9/21/2015
 	- Internal code changes.
 	- Trunks show native VLAN (if mismatched then both P and C will be displayed)
