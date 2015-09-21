@@ -6,7 +6,7 @@ mjlaforest@gmail.com
 CHANGE LOG
 --------------------
 
-v0.8 -
+v0.8 - 9/21/2015
 	- Internal code changes.
 	- Trunks show native VLAN (if mismatched then both P and C will be displayed)
 	- Trunks show allowed VLANs (if mismatched then both P and C will be displayed) (standard range only)
