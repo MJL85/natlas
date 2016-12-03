@@ -107,7 +107,7 @@ OID_ERR_INST	= 'No Such Instance currently exists at this OID'
 ENTPHYCLASS_OTHER         = 1
 ENTPHYCLASS_UNKNOWN       = 2
 ENTPHYCLASS_CHASSIS       = 3
-ENTPHYCLASS_BACKPLANE     = 4 
+ENTPHYCLASS_BACKPLANE     = 4
 ENTPHYCLASS_CONTAINER     = 5
 ENTPHYCLASS_POWERSUPPLY   = 6
 ENTPHYCLASS_FAN           = 7
@@ -138,7 +138,7 @@ class mnet_snmp:
 			# we don't currently support anything other than SNMPv2
 			if (cred['ver'] != 2):
 				continue
-			
+
 			community = cred['community']
 
 			cmdGen = cmdgen.CommandGenerator()
@@ -146,7 +146,7 @@ class mnet_snmp:
 					cmdgen.CommunityData(community),
 					cmdgen.UdpTransportTarget((self._ip, SNMP_PORT)),
 					'1.3.6.1.2.1.1.5.0',
-					lookupNames = False, lookupValues = True
+					lookupNames = False, lookupValues = False
 			)
 			if errIndication:
 				continue
@@ -167,7 +167,7 @@ class mnet_snmp:
 		errIndication, errStatus, errIndex, varBinds = cmdGen.getCmd(
 				cmdgen.CommunityData(self.v2_community),
 				cmdgen.UdpTransportTarget((self._ip, SNMP_PORT), retries=2),
-				oid, lookupNames = False, lookupValues = True
+				oid, lookupNames = False, lookupValues = False
 		)
 
 		if errIndication:
@@ -193,7 +193,7 @@ class mnet_snmp:
 				cmdgen.UdpTransportTarget((self._ip, SNMP_PORT), timeout=30, retries=2),
 				0, 10,
 				oid,
-				lookupNames = False, lookupValues = True
+				lookupNames = False, lookupValues = False
 		)
 
 		if errIndication:
@@ -202,7 +202,8 @@ class mnet_snmp:
 			ret = []
 			for r in varBindTable:
 				for n, v in r:
-					if (n.prettyPrint().startswith(oid) == 0):
+					n = str(n)
+					if (n.startswith(oid) == 0):
 						return ret
 					ret.append(r)
 			return ret
@@ -216,8 +217,7 @@ class mnet_snmp:
 	def cache_lookup(self, varBindTable, name):
 		for r in varBindTable:
 			for n, v in r:
-				if (n.prettyPrint() == name):
+				n = str(n)
+				if (n == name):
 					return v.prettyPrint()
 		return None
-
-
