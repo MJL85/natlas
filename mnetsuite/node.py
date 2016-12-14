@@ -163,22 +163,24 @@ class mnet_node_stack:
 			self.count = 0
 			for row in vbtbl:
 				for n, v in row:
-					if (n.prettyPrint().startswith(OID_STACK_NUM + '.')):
+					n = str(n)
+					if (n.startswith(OID_STACK_NUM + '.')):
 						self.count += 1
 
 			if (self.count == 1):
 				self.count = 0
-			return				
+			return
 
 		serial_vbtbl = snmpobj.get_bulk(OID_ENTPHYENTRY_SERIAL)
 		platf_vbtbl  = snmpobj.get_bulk(OID_ENTPHYENTRY_PLAT)
 
 		for row in vbtbl:
 			for n, v in row:
-				if (n.prettyPrint().startswith(OID_STACK_NUM + '.')):
+				n = str(n)
+				if (n.startswith(OID_STACK_NUM + '.')):
 					m = mnet_node_stack_member()
 
-					t = n.prettyPrint().split('.')
+					t = n.split('.')
 					idx = t[14]
 
 					m.num  = v
@@ -255,7 +257,8 @@ class mnet_node_vss:
 		for row in class_vbtbl:
 			for n, v in row:
 				if (v == 9):
-					t = n.prettyPrint().split('.')
+					n = str(n)
+					t = n.split('.')
 					modidx = t[12]
 					if (module > 1):
 						print('[E] More than 2 modules found for VSS device! Skipping after the second...')
@@ -288,7 +291,7 @@ class mnet_node:
 		get_lo = False
 		get_bootf = False
 		get_chassis_info = False
-	
+
 		def __init__(self):
 			self.reset()
 
@@ -439,7 +442,7 @@ class mnet_node:
 		# vss
 		if (self.opts.get_vss):
 			self.vss = mnet_node_vss(snmpobj, self.opts.get_vss_details)
-		
+
 		# serial
 		if ((self.opts.get_serial == 1) & (self.stack.count == 0) & (self.vss.enabled == 0)):
 			self.serial = snmpobj.get_val(OID_SYS_SERIAL)
@@ -454,7 +457,8 @@ class mnet_node:
 
 			for row in self.svi_vbtbl:
 				for n, v in row:
-					vlan = n.prettyPrint().split('.')[14]
+					n = str(n)
+					vlan = n.split('.')[14]
 					svi = mnet_node_svi(vlan)
 					svi_ips = self._get_cidrs_from_ifidx(v)
 					svi.ip.extend(svi_ips)
@@ -466,14 +470,15 @@ class mnet_node:
 
 			if (self.ifip_vbtbl == None):
 				self.ifip_vbtbl = snmpobj.get_bulk(OID_IF_IP)
-			
+
 			for row in self.ethif_vbtbl:
 				for n, v in row:
-					if (n.prettyPrint().startswith(OID_ETH_IF_TYPE) & (v == 24)):
-						ifidx = n.prettyPrint().split('.')[10]
+					n = str(n)
+					if (n.startswith(OID_ETH_IF_TYPE) & (v == 24)):
+						ifidx = n.split('.')[10]
 						lo_name = snmpobj.cache_lookup(self.ethif_vbtbl, OID_ETH_IF_DESC + '.' + ifidx)
 						lo_ips = self._get_cidrs_from_ifidx(ifidx)
-						lo = mnet_node_lo(lo_name, lo_ips) 
+						lo = mnet_node_lo(lo_name, lo_ips)
 						self.loopbacks.append(lo)
 
 		# bootfile
@@ -494,9 +499,10 @@ class mnet_node:
 
 		for ifrow in self.ifip_vbtbl:
 			for ifn, ifv in ifrow:
-				if (ifn.prettyPrint().startswith(OID_IF_IP_ADDR)):
+				ifn = str(ifn)
+				if (ifn.startswith(OID_IF_IP_ADDR)):
 					if (str(ifv) == str(ifidx)):
-						t = ifn.prettyPrint().split('.')
+						t = ifn.split('.')
 						ip = ".".join(t[10:])
 						mask = self.snmpobj.cache_lookup(self.ifip_vbtbl, OID_IF_IP_NETM + ip)
 						nbits = get_net_bits_from_mask(mask)
@@ -535,22 +541,24 @@ class mnet_node:
 	def get_cdp_neighbors(self):
 		neighbors = []
 		snmpobj = self.snmpobj
-		
+
 		# get list of CDP neighbors
 		self.cdp_vbtbl = snmpobj.get_bulk(OID_CDP)
 		if (self.cdp_vbtbl == None):
+			print 'No CDP Neighbors Found.'
 			return None
 
 		# cache some common MIB trees
 		self._cache_common_mibs()
-		
+
 		for row in self.cdp_vbtbl:
 			for name, val in row:
+				name = str(name)
 				# process only if this row is a CDP_DEVID
-				if (name.prettyPrint().startswith(OID_CDP_DEVID) == 0):
+				if (name.startswith(OID_CDP_DEVID) == 0):
 					continue
 
-				t = name.prettyPrint().split('.')
+				t = name.split('.')
 				ifidx = t[14]
 				ifidx2 = t[15]
 
@@ -598,27 +606,30 @@ class mnet_node:
 	def get_lldp_neighbors(self):
 		neighbors = []
 		snmpobj = self.snmpobj
-		
+
 		self.lldp_vbtbl = snmpobj.get_bulk(OID_LLDP)
 		if (self.lldp_vbtbl == None):
+			print 'No LLDP Neighbors Found.'
 			return None
 
 		self._cache_common_mibs()
-		
+
 		for row in self.lldp_vbtbl:
 			for name, val in row:
-				if (name.prettyPrint().startswith(OID_LLDP_TYPE) == 0):
+				name = str(name)
+				if (name.startswith(OID_LLDP_TYPE) == 0):
 					continue
 
-				t = name.prettyPrint().split('.')
+				t = name.split('.')
 				ifidx = t[12]
 				ifidx2 = t[13]
 
 				rip = ''
 				for r in self.lldp_vbtbl:
 					for	n, v in r:
-						if (n.prettyPrint().startswith(OID_LLDP_DEVADDR + '.' + ifidx + '.' + ifidx2)):
-							t2 = n.prettyPrint().split('.')
+						n = str(n)
+						if (n.startswith(OID_LLDP_DEVADDR + '.' + ifidx + '.' + ifidx2)):
+							t2 = n.split('.')
 							rip = '.'.join(t2[16:])
 
 
@@ -709,7 +720,7 @@ class mnet_node:
 	def _parse_allowed_vlans(self, allowed_vlans):
 		if (allowed_vlans.startswith('0x') == False):
 			return 'All'
-	
+
 		ret = ''
 		group = 0
 		op = 0
@@ -778,10 +789,11 @@ class mnet_node:
 
 		for row in class_vbtbl:
 			for n, v in row:
+				n = str(n)
 				if (v != ENTPHYCLASS_CHASSIS):
 					continue
 
-				t = n.prettyPrint().split('.')
+				t = n.split('.')
 				idx = t[12]
 
 				self.serial = snmpobj.cache_lookup(serial_vbtbl, OID_ENTPHYENTRY_SERIAL + '.' + idx)
@@ -792,10 +804,11 @@ class mnet_node:
 		if (self.ios == ''):
 			for row in class_vbtbl:
 				for n, v in row:
+					n = str(n)
 					if (v != ENTPHYCLASS_MODULE):
 						continue
 
-					t = n.prettyPrint().split('.')
+					t = n.split('.')
 					idx = t[12]
 
 					self.ios = snmpobj.cache_lookup(ios_vbtbl, OID_ENTPHYENTRY_SOFTWARE + '.' + idx)
@@ -833,4 +846,3 @@ class mnet_node:
 			return img_s.group(2)
 
 		return img
-
