@@ -45,7 +45,8 @@ class mnet_tracemac:
 	def load_config(self, config_file):
 		if (config_file):
 			self.config.load(config_file)
-
+	
+	
 	#
 	# Connect to the node at the specified IP and search for the
 	# specified MAC address in the table.
@@ -87,8 +88,8 @@ class mnet_tracemac:
 					continue
 
 				# change our SNMP credentials
-				old_cred = snmpobj._cred
-				snmpobj._cred['community'] = old_cred['community'] + '@' + str(vlan)
+				old_cred = snmpobj.v2_community
+				snmpobj.v2_community = old_cred + '@' + str(vlan)
 
 				cam_vbtbl = snmpobj.get_bulk(OID_VLAN_CAM)
 				cam_match = None
@@ -111,7 +112,7 @@ class mnet_tracemac:
 				ifidx = snmpobj.get_val(OID_IFINDEX + '.' + bridge_portnum)
 
 				# restore SNMP credentials
-				snmpobj._cred = old_cred
+				snmpobj.v2_community = old_cred
 				
 				port = snmpobj.get_val(OID_IFNAME + '.' + ifidx)
 
@@ -166,4 +167,5 @@ class mnet_tracemac:
 			mac_hex += chr(int(mac_str[i:i+2], 16))
 
 		return mac_hex
+
 
