@@ -620,32 +620,36 @@ class mnet_node:
 				if (name.startswith(OID_LLDP_TYPE) == 0):
 					continue
 
+#from LLDP MIP INDEX=  lldpRemTimeMark, lldpRemLocalPortNum, lldpRemIndex
+#cisco sets lldpRemTimeMark to zero; others may not.
 				t = name.split('.')
+                                ifidx0 = t[11]
 				ifidx = t[12]
 				ifidx2 = t[13]
+                                rowindex= '.' + ifidx0 + '.' + ifidx + '.' + ifidx2
 
 				rip = ''
 				for r in self.lldp_vbtbl:
 					for	n, v in r:
 						n = str(n)
-						if (n.startswith(OID_LLDP_DEVADDR + '.' + ifidx + '.' + ifidx2)):
+						if (n.startswith(OID_LLDP_DEVADDR + rowindex)):
 							t2 = n.split('.')
 							rip = '.'.join(t2[16:])
 
 
 				lport = self._get_ifname(ifidx)
 
-				rport = snmpobj.cache_lookup(self.lldp_vbtbl, OID_LLDP_DEVPORT + '.' + ifidx + '.' + ifidx2)
+				rport = snmpobj.cache_lookup(self.lldp_vbtbl, OID_LLDP_DEVPORT + rowindex)
 				rport = shorten_port_name(rport)
 
-				devid = snmpobj.cache_lookup(self.lldp_vbtbl, OID_LLDP_DEVID + '.' + ifidx + '.' + ifidx2)
+				devid = snmpobj.cache_lookup(self.lldp_vbtbl, OID_LLDP_DEVID + rowindex)
 				try:
 					mac_seg = [devid[x:x+4] for x in xrange(2, len(devid), 4)]
 					devid = '.'.join(mac_seg)
 				except:
 					pass
 
-				rimg = snmpobj.cache_lookup(self.lldp_vbtbl, OID_LLDP_DEVDESC + '.' + ifidx + '.' + ifidx2)
+				rimg = snmpobj.cache_lookup(self.lldp_vbtbl, OID_LLDP_DEVDESC + rowindex)
 				if (rimg != None):
 					try:
 						rimg = binascii.unhexlify(rimg[2:])
@@ -653,7 +657,7 @@ class mnet_node:
 						pass
 					rimg = self._format_ios_ver(rimg)
 
-				name = snmpobj.cache_lookup(self.lldp_vbtbl, OID_LLDP_DEVNAME + '.' + ifidx + '.' + ifidx2)
+				name = snmpobj.cache_lookup(self.lldp_vbtbl, OID_LLDP_DEVNAME + rowindex)
 				if ((name == None) | (name == '')):
 					name = devid
 
