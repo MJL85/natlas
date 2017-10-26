@@ -9,6 +9,7 @@ CHANGE LOG
 v0.9 -
 	graph
 	- Fixed bug with allowed VLAN lists not showing correct ranges.
+	- Fixed bug where certain SNMP lookups could return empty sets and cause an exception 
 
 v0.8 - 9/21/2015
 	- Internal code changes.

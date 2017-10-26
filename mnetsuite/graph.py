@@ -26,6 +26,7 @@
 
 import sys
 import getopt
+import dot_parser
 import pydot
 import datetime
 import os

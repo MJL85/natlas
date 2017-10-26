@@ -215,9 +215,13 @@ class mnet_snmp:
 	# Lookup a value from the return table of get_bulk()
 	#
 	def cache_lookup(self, varBindTable, name):
+		if (varBindTable == None):
+			return None
+
 		for r in varBindTable:
 			for n, v in r:
 				n = str(n)
 				if (n == name):
 					return v.prettyPrint()
 		return None
+
