@@ -41,9 +41,10 @@ class mnet_config_graph:
 
 class mnet_config:
 	host_domains	= []
-	snmp_creds		= []
+	snmp_cred	= []
 	exclude_subnets	= []
 	allowed_subnets	= []
+        exclude_hosts   = []
 	graph = None
 
 	def __init__(self):
@@ -59,10 +60,11 @@ class mnet_config:
 		if (json_data == None):
 			return 0
 
-		self.host_domains		= json_data['domains']
-		self.snmp_creds			= json_data['snmp']
+		self.host_domains	= json_data['domains']
+		self.snmp_creds		= json_data['snmp']
 		self.exclude_subnets	= json_data['exclude']
 		self.allowed_subnets	= json_data['subnets']
+		self.exclude_hosts      = json_data['exclude_hosts']
 
 		json_graph = json_data.get('graph', None)
 		if (json_graph != None):
@@ -109,6 +111,8 @@ class mnet_config:
 				'		"10.0.0.0/8",\n' \
 				'		"0.0.0.0/32"\n' \
 				'	],\n' \
+                                '       "exclude_hosts": [\n' \
+                                '       ],\n' \
 				'	"graph" : {\n' \
 				'		"node_text_size" : 10,\n' \
 				'		"link_text_size" : 9,\n' \

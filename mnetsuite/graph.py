@@ -223,6 +223,15 @@ class mnet_graph:
 			# if the remote IP is not allowed, stop processing it here
 			if (self.is_node_allowed(n.remote_ip) == 0):
 				continue
+               
+                        # excluded device name?
+                        stop = 0
+                        for d in self.config.exclude_hosts:
+                            if (re.search(d, n.remote_name)):
+                                stop = 1
+                                break
+                        if (stop):
+                            continue
 
 			# get the child info
 			if (n.remote_ip != 'UNKNOWN'):
