@@ -1,9 +1,13 @@
 # mnet
+
 mnet Suite - Tools for network professionals.  
 Michael Laforest `<mjlaforest` *at* `gmail` *dot* `com>`
   
 Automated discovery and diagram tools using SNMP, CDP, and LLDP.
 
+ ```# ./mnet.py diagram -r 10.75.0.1 -o .\network.svg```<br><br><br>*The above command will generate the diagram to the right.* | ![MNet-Diagram Ex3][diag3]
+:--- | --- 
+ 
 # Support
 
 If you use any of these tools or find them useful please consider donating.  
@@ -13,70 +17,73 @@ Donation Method | Address | QR Code
 Bitcoin (BTC) | 1HY3jPYVfE6YZbuYTYfMpazvSKRXjZDMbS  | ![1HY3jPYVfE6YZbuYTYfMpazvSKRXjZDMbS](https://github.com/MJL85/mnet/blob/master/docs/donate/BTC.png "Bitcoin (BTC)")
 Bitcoin Cash (BCH) | 1HSycjR3LAZxuLG34aEBbQdUSayPkh8XsH | ![1HSycjR3LAZxuLG34aEBbQdUSayPkh8XsH](https://github.com/MJL85/mnet/blob/master/docs/donate/BCH.png "Bitcoin Cash (BCH)")
 
-# Suite Tools
+# Tools
 | Module | Description |
 | --- | --- |
 | Diagram | Discovers a network and generates a diagram based on CDP and LLDP neighbor information. |
 | TraceMAC | Attempts to locate a specific MAC address by recursively looking it up in switch CAM tables. |
 | GetMACS | Collect a list of all MAC addresses on the discovered network and generate a report. |
 
-# Installing mnet
-
-mnet can be installed through Python's pip.  
+# Network Discovery  
   
-`# pip install mnet`
+The discovery process uses SNMP, CDP, and LLDP to discover the network topology and details about each node.  Each discovered node will be evaluated against the `discover` ACL (defined in the config file) to determine how to proceed; the ACL may allow discovery, stop discovery here, or include it as a leaf in the diagram.
 
-# Running mnet
+<table>
+	<tr>
+	<td valign=top rowspan=2>
+		The <i>discover</i> ACL is defined as
+	<pre><code>"discover" : [
+	ACE1,
+	ACE2,
+	...
+	ACEn,
+]</code></pre>
+	</td>
+	<td valign=top>
+		An <i>ACE</i> is defined as  
+	<pre><code>&lt;permit|deny|leaf|include|;&gt; &lt; [host REGEX] | [ip CIDR] &gt;</code></pre>
+	</td>
+	</tr>
+	<tr>
+	<td>
+Example
+	<pre><code>"discover" : [
+	"deny ip 10.50.12.55",
+	"deny host ^SEP.*",
+	"permit ip 10.50.12.0/24",
+	"leaf host ^Switch2$",
+	"permit ip any"
+]</code>	</td>
+	</tr>
+</table>
 
-### Network Discovery  
-  
-A network discovery will be performed For the `diagram` and `getmacs` modules.  The discovery process will use SNMP, CDP, and LLDP to discover the network topology and details about each node.  
-  
-The discovery will begin at the specified root node and perform the following actions:
+---
 
-1. Collect a list of adjacencies through CDP and LLDP.  
-2. Evaluate each  adjacent node against the `discover` ACL.
-3. If the ACL permits discovery then collect information from that node.
-4. If the current discovered depth is less than the user deviced maximum depth, repeat step 1 with this node.
-  
-The `discover` ACL is defined in the configuration file as:
-
-```
-"discover" : [
-    ACE,
-    ACE,
-    ACE
-]
-```
-
-An ACE is defined as:  
-  
-```<permit|deny|leaf|include|;> < [host REGEX] | [ip CIDR] >```
-  
-| Option | Include Node | Collect Node Information | Allow Discovery of Adjacencies |
+| ACE Match Type| Include Node | Collect Node Information | Allow Discovery of Adjacencies |
 | --- |:---:|:---:|:---:|
-| permit | X | X | X |
-| leaf | X | X |  |
-| include | X |  |  |
-| deny |  |  |  |
-  
-| Parameter | Description | Example |
+| **permit** | yes | yes | yes |
+| **leaf** | yes | yes |  |
+| **include** | yes |  |  |
+| **deny** |  |  |  |
+
+  ---
+ 
+| ACE Parameter | Description | Example |
 | --- | --- | --- |
 | host REGEX | The host can be matched against any regular expression string.  The host string is what is reported from CDP or LLDP. | `host Router-.*` |
 | ip CIDR | The ip can be matched against and CIDR. | `ip 10.50.31.0/24` |
 
-### Diagram Module
+# Command Reference
 
+### Diagram
 ```
-mnet.py diagram -r <root IP>
+# mnet.py diagram -r <root IP>
                 -o <output file>
                [-d <max depth>]
                [-c <config file>]
                [-t <diagram title>]
                [-C <catalog file>]
 ```
-The above command will discover the network and generate a network diagram.
-
 | Option | Description |
 | --- | --- |
 | `-r <root IP>` | IP address of the network node to start on. |
@@ -86,31 +93,25 @@ The above command will discover the network and generate a network diagram.
 | `-t <diagram title>` | The title to give your generated network diagram. |
 | `-C <catalog file>` | If specified, mnet will generate a comma separated (CSV) catalog file with a list of all devices discovered. |
 
-### TraceMAC Module
-
+### TraceMAC
 ```
-mnet.py tracemac -r <root IP>
+# mnet.py tracemac -r <root IP>
                  -m <MAC Address>
                  [-c <config file>]
 ```
-The above command will run the `TraceMAC` module and trace a MAC address through CAM tables.
-
 | Option | Description |
 | --- | --- |
 | `-r <root IP>` | IP address of the network node to start on. |
 | `-m <MAC Address>` | The MAC address to locate.  Can be in any form.  Ex: `11:22:33:44:55:66` or `112233445566` or `1122.3344.5566` |
 | `-c <config file>` | The JSON configuration file to use. |
 
-### GetMACS Module
-
+### GetMACS
 ```
-mnet.py getmacs -r <root IP>
+# mnet.py getmacs -r <root IP>
                  -o <output CSV file>
                  [-d <mac depth>]
                  [-c <config file>]
 ```
-Discover the network per the `discover` rules in the configuration file, then generate a CSV output file of all MAC addresses.
-
 | Option | Description |
 | --- | --- |
 | `-r <root IP>` | IP address of the network node to start on. |
@@ -119,20 +120,12 @@ Discover the network per the `discover` rules in the configuration file, then ge
 | `-c <config file>` | The JSON configuration file to use. |
 
 
-### Config Module
-
+### Config
 ```
-mnet.py config
+# mnet.py config
 ```
-The above command will run the `config` module and output a standard config to stdout.  
-  
-Use this module and redirect stdout to a file in order to create a new blank config file.  
-`# mnet.py config > mnet.conf`
-
 # Configuration File
-
-The toolset uses a JSON configuration file for common parameters.
-
+The configuration file defines common parameters in a JSON format.
 ```
 {
 	"snmp" : [
@@ -165,12 +158,11 @@ The toolset uses a JSON configuration file for common parameters.
 
 | Block / Variable | Description |
 | --- | --- |
-| `snmp` | Defines a list of SNMP credentials.  When connecting to a node, each of these credentials is tried in order until one is successful.  This allows crawling a large network with devices that potentially use different SNMP credentials. |
+| `snmp` | Defines a list of SNMP credentials.  When connecting to a node, each of these credentials is tried in order until one is successful. |
 | `discover` | Defines a Cisco-style ACL. See the `Network Discovery` section. |
-| `diagram` | Defines specific values used to change diagram attributes.  Detailed below in the *Diagram block* table. |
+| `diagram` | Defines values used by the diagram module.  Detailed below in the *Diagram block* table. |
 
-**Diagram block**
-
+### Diagram block
 | Variable | Type | Default Value | Description |
 | --- | --- | --- | --- |
 | `node_text_size` | integer | `10` | Node text size. |
@@ -183,12 +175,7 @@ The toolset uses a JSON configuration file for common parameters.
 | `expand_lag` | bool | `1` | If set to `1`, each link between nodes will be shown.  If set to `0`, links of the same logical link channel will be grouped and only the channel link will be shown. |
 | `group_vpc` | bool | `0` | If set to `1`, VPC peers will be grouped together on the diagram, otherwise they will not be clustered. |
 
-# mnet's Diagram Module
-
-### Details
-
-A network discovery will be performed and a network diagram will be generated. 
-  
+# Diagram
 mnet will attempt to collect the following information and include it in the generated diagram:
 + All devices (via CDP and LLDP)
 + Interface names
@@ -206,7 +193,7 @@ mnet will attempt to collect the following information and include it in the gen
 + Stackwise membership
 + VPC peerlink information
 
-mnet's Diagram module attempts to include all of the above information in the diagram in an intuitive way.  The keep the diagram clean, the following are used:
+#### Diagram Formatting
 + Nodes
   + Circle nodes represent layer 2 switches.
   + Diamond nodes represent layer 3 switches or routers.
@@ -219,7 +206,7 @@ mnet's Diagram module attempts to include all of the above information in the di
   + If a link says *P:gi0/1* , *C:gi1/4* then the parent node's connection is on port gi0/1 and the child node's connection is on port gi1/4.
   + If the link is part of an Etherchannel the etherchannel's interface name will also be shown.  Since an etherchannel interface is locally significiant, a *P:* and *C:* will also be shown if available.
 
-### Examples
+#### Examples
 
 Example 1
 ![MNet-Diagram Ex1](http://i.imgur.com/Mny7PLl.png "MNet-Graph Ex1")
@@ -230,9 +217,9 @@ Example 2
 Example 3
 ![MNet-Diagram Ex3](http://i.imgur.com/i1dqM09.png "MNet-Graph Ex3")
 
-# mnet's TraceMAC Module
+# TraceMAC
 
-### Examples
+#### Examples
 
 The below example shows a trace for MAC address `00:23:68:63:75:70` starting
 at node `10.10.0.3`.  The MAC address is found on switch `IDF3_D` on port
@@ -246,8 +233,6 @@ Written by Michael Laforest <mjlaforest@gmail.com>
      Config file: ./mnet.conf
        Root node: 10.10.0.3
      MAC address: 0023.6863.7570
-
-
 
 Start trace.
 ------------
@@ -269,28 +254,28 @@ IDF3_D (10.10.0.6)
 ------------
 Trace complete.
 ```
-
 # FAQ
 
-**Q.** `My diagram is too large.  I only want to diagram part of my network.`
+#### Q1 - My diagram is too large.  I only want to diagram part of my network.
+Try changing the config `discover` ACL to narrow down the scope of your discovery.  You can explicitly deny CIDR's or host name regex patterns if you do not want them included in your diagram.  
+  
+#### Q2 - Where is the config file?
+Create a new one with
+`# mnet.py config > mnet.conf`
 
-**A.** Try changing the config `discover` ACL to narrow down the scope of your discovery.  You can explicitly deny CIDR's or host name regex patterns if you do not want them included in your diagram.  
-  
-**Q.** `My diagram is still too wide.  What can I do?`  
-  
-**A.** Try to use the Graphviz `unflatted` command line program to reformat the generated dot file.  
-  
-**Q.** `Where is the config file?`  
-  
-*A.* If you need a config file you can generate a new one with `# mnet.py config > mnet.conf` .
-
-**Q.** `I need a diagram with less proprietary information. Can I get one without IPs or serial numbers?`
-
-*A.* Yes, you can change the text inside each node by editing the config option `diagram\node_text`. Below is an example that would produce a minimal information diagram:
+#### Q3 - I need a diagram with less proprietary information. Can I get one without IPs or serial numbers?
+You can change the text inside each node by editing the config option `diagram\node_text`. Below is an example that would produce a minimal information diagram:
 
 ```
 "diagram" : {
 	node_text = '<font point-size="10"><b>{node.name}</b></font><br />{node.ios}<br />{node.plat}'
 }	
+``` 
+#### Q4 - How can I remove Cisco VoIP phones from my diagram?
 ```
+"discover" : [
+	"deny host ^SEP.*$"
+]
+``` 
 
+[diag3]: http://i.imgur.com/i1dqM09.png "MNet-Graph Ex3"
