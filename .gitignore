@@ -4,4 +4,6 @@
 dist
 *~
 *.log
-
+*.swp
+IDEAS
+mnetsuite/mac.py

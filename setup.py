@@ -23,36 +23,37 @@ _version = imp.load_source('', 'mnetsuite/_version.py')
 long_description = open('README.md').read()
 
 setup(
-	name				= 'mnet',
-	version				= _version.__version__,
-	author				= 'Michael Laforest',
-	author_email		= 'mjlaforest@gmail.com',
-	license				= 'LICENSE',
-	url					= 'http://github.com/MJL85/mnet/',
+        name                    = 'mnet',
+        version                 = _version.__version__,
+        author                  = 'Michael Laforest',
+        author_email            = 'mjlaforest@gmail.com',
+        license                 = 'LICENSE',
+        url                     = 'http://github.com/MJL85/mnet/',
 
-	description			= 'MNet Suite is a collection of Python tools for network professionals.',
-	long_description	= long_description,
-	keywords			= 'python network cisco diagram snmp cdp',
+        description             = 'MNet Suite is a collection of Python tools for network professionals.',
+        long_description        = long_description,
+        keywords                = 'python network cisco diagram snmp cdp',
 
-	classifiers = [
-		'Development Status :: 4 - Beta',
-		'Intended Audience :: Information Technology',
-		'License :: OSI Approved :: GNU General Public License v2 (GPLv2)',
-		'Operating System :: OS Independent',
-		'Programming Language :: Python',
-		'Topic :: Utilities'
-	],
+        classifiers = [
+                'Development Status :: 4 - Beta',
+                'Intended Audience :: Information Technology',
+                'License :: OSI Approved :: GNU General Public License v2 (GPLv2)',
+                'Operating System :: OS Independent',
+                'Programming Language :: Python',
+                'Topic :: Utilities'
+        ],
 
-	packages = ['mnetsuite'],
-	include_package_data = True,
+        packages = ['mnetsuite'],
+        include_package_data = True,
 
-	scripts = [ 'mnet.py' ],
+        scripts = [ 'mnet.py' ],
 
-	install_requires = [
-		'pysnmp>=4.2.5',
-		'pyparsing==2.0.6',	
-		'pydot2',
-		'netaddr>=0.7.14'
-	]
+        install_requires = [
+            'graphviz',
+            'pysnmp',
+            'pydot',
+            'pysnmp>=4.2.5',
+            'pyparsing',
+            'netaddr>=0.7.14'
+        ]
 )
-

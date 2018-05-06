@@ -1,199 +1,266 @@
 #!/usr/bin/python
 
 '''
-	MNet Suite
-	mnet.py
+        MNet Suite
+        mnet.py
 
-	Michael Laforest
-	mjlaforest@gmail.com
+        Michael Laforest
+        mjlaforest@gmail.com
 
-	Copyright (C) 2015 Michael Laforest
+        Copyright (C) 2015-2018 Michael Laforest
 
-	This program is free software; you can redistribute it and/or
-	modify it under the terms of the GNU General Public License
-	as published by the Free Software Foundation; either version 2
-	of the License, or (at your option) any later version.
+        This program is free software; you can redistribute it and/or
+        modify it under the terms of the GNU General Public License
+        as published by the Free Software Foundation; either version 2
+        of the License, or (at your option) any later version.
 
-	This program is distributed in the hope that it will be useful,
-	but WITHOUT ANY WARRANTY; without even the implied warranty of
-	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-	GNU General Public License for more details.
+        This program is distributed in the hope that it will be useful,
+        but WITHOUT ANY WARRANTY; without even the implied warranty of
+        MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+        GNU General Public License for more details.
 
-	You should have received a copy of the GNU General Public License
-	along with this program; if not, write to the Free Software
-	Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+        You should have received a copy of the GNU General Public License
+        along with this program; if not, write to the Free Software
+        Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 '''
 
 import sys
 import getopt
 import datetime
 import os
+from timeit import default_timer as timer
 
 import mnetsuite
 
+DEFAULT_OPT_DEPTH   = 100
+DEFAULT_OPT_TITLE   = 'mnet Network Diagram'
+DEFAULT_OPT_CONF    = './mnet.conf'
+
 def print_syntax():
-	print('Usage:\n'
-			'  mnet.py graph -r <root IP>\n'
-			'                -f <file>\n'
-			'                [-d <max depth>]\n'
-			'                [-c <config file>]\n'
-			'                [-t <diagram title>]\n'
-			'                [-C <catalog file>]\n'
-			'\n'
-			'  mnet.py tracemac -r <root IP>\n'
-			'                   -m <MAC Address>\n'
-			'                   [-c <config file>]\n'
-			'\n'
-			'  mnet.py config\n'
-		)
+    print('Usage:\n'
+                    '  mnet.py diagram -r <root IP>\n'
+                    '                -o <output file>\n'
+                    '                [-d <max depth>]\n'
+                    '                [-c <config file>]\n'
+                    '                [-t <diagram title>]\n'
+                    '                [-C <catalog file>]\n'
+                    '\n'
+                    '  mnet.py tracemac -r <root IP>\n'
+                    '                   -m <MAC Address>\n'
+                    '                   [-c <config file>]\n'
+                    '\n'
+                    '  mnet.py getmacs -r <root IP>\n'
+                    '                  -o <output CSV file>\n'
+                    '                  [-d <max depth>]\n'
+                    '                  [-c <config file>]\n'
+                    '\n'
+                    '  mnet.py config\n'
+            )
 
 
 def print_banner():
-	print('MNet Suite v%s' % mnetsuite.__version__)
-	print('Written by Michael Laforest <mjlaforest@gmail.com>')
-	print('')
+    print('mnet suite v%s' % mnetsuite.__version__)
+    print('Michael Laforest <mjlaforest@gmail.com>')
+    print('')
 
 
 def main(argv):
-	opt_root_ip = None
-	if (len(argv) < 1):
-		print_banner()
-		print_syntax()
-		return
+    opt_root_ip = None
+    if (len(argv) < 1):
+        print_banner()
+        print_syntax()
+        return
 
-	mod = argv[0]
-	if (mod == 'graph'):
-		print_banner()
-		graph(argv[1:])
-	elif (mod == 'tracemac'):
-		print_banner()
-		tracemac(argv[1:])
-	elif (mod == 'config'):
-		generate_config()
-	else:
-		print_banner()
-		print_syntax()
+    start = timer()
+    mod = argv[0]
+    if (mod == 'diagram'):
+        print_banner()
+        diagram(argv[1:])
+    elif (mod == 'tracemac'):
+        print_banner()
+        tracemac(argv[1:])
+    elif (mod == 'getmacs'):
+        print_banner()
+        getmacs(argv[1:])
+    elif (mod == 'config'):
+        generate_config()
+    else:
+        print_banner()
+        print_syntax()
 
+    s = timer() - start
+    h=int(s/3600)
+    m=int((s-(h*3600))/60)
+    s=s-(int(s/3600)*3600)-(m*60)
+    print('Completed in %i:%i:%.2fs' % (h, m, s))
 
-def graph(argv):
-	max_depth = 0
+def diagram(argv):
+    opt_root_ip = None
+    opt_output  = None
+    opt_catalog = None
+    opt_depth   = DEFAULT_OPT_DEPTH
+    opt_title   = DEFAULT_OPT_TITLE
+    opt_conf    = DEFAULT_OPT_CONF
 
-	graph = mnetsuite.mnet_graph()
+    try:
+        opts, args = getopt.getopt(argv, 'o:d:r:t:F:c:C:')
+    except getopt.GetoptError:
+        print_syntax()
+        sys.exit(1)
+    for opt, arg in opts:
+        if (opt == '-r'):
+            opt_root_ip = arg
+        if (opt == '-o'):
+            opt_output = arg
+        if (opt == '-d'):
+            opt_depth = int(arg)
+        if (opt == '-t'):
+            opt_title = arg
+        if (opt == '-c'):
+            opt_conf = arg
+        if (opt == '-C'):
+            opt_catalog = arg
 
-	opt_dot = None
-	opt_depth = 0
-	opt_title = 'MNet Network Diagram'
-	opt_conf = './mnet.conf'
-	opt_catalog = None
+    if ((opt_root_ip == None) | (opt_output == None)):
+        print_syntax()
+        print('Invalid arguments.')
+        return
 
-	try:
-		opts, args = getopt.getopt(argv, 'f:d:r:t:F:c:C:')
-	except getopt.GetoptError:
-		print_syntax()
-		sys.exit(1)
-	for opt, arg in opts:
-		if (opt == '-r'):
-			opt_root_ip = arg
-		if (opt == '-f'):
-			opt_dot = arg
-		if (opt == '-d'):
-			opt_depth = int(arg)
-			max_depth = int(arg)
-		if (opt == '-t'):
-			opt_title = arg
-		if (opt == '-c'):
-			opt_conf = arg
-		if (opt == '-C'):
-			opt_catalog = arg
+    print('     Config file: %s' % opt_conf)
+    print('     Output file: %s' % opt_output)
+    print('Out Catalog file: %s' % opt_catalog)
+    print('       Root node: %s' % opt_root_ip)
+    print('  Discover depth: %s' % opt_depth)
+    print('   Diagram title: %s' % opt_title)
+    print()
 
-	if ((opt_root_ip == None) | (opt_dot == None)):
-		print_syntax()
-		print('Invalid arguments.')
-		return
+    # load the config
+    config = mnetsuite.mnet_config()
+    if (config.load(opt_conf) == 0):
+        return 0
 
-	print('     Config file: %s' % opt_conf)
-	print('       Root node: %s' % opt_root_ip)
-	print('     Output file: %s' % opt_dot)
-	print('     Crawl depth: %s' % opt_depth)
-	print('   Diagram title: %s' % opt_title)
-	print('Out Catalog file: %s' % opt_catalog)
+    # start discovery
+    network = mnetsuite.mnet_network(config)
+    network.set_max_depth(opt_depth)
+    network.discover(opt_root_ip)
+    network.discover_details()
 
-	print('\n\n')
+    # outputs
+    #stdout = mnetsuite.mnet_output_stdout(network)
+    #stdout.generate()
 
-	# load the config
-	if (graph.load_config(opt_conf) == 0):
-		return
-	graph.set_max_depth(opt_depth)
+    if (opt_output != None):
+        diagram = mnetsuite.mnet_output_diagram(network)
+        diagram.generate(opt_output, opt_title)
 
-	# start
-	graph.crawl(opt_root_ip)
-		
-	# outputs
-	graph.output_stdout()
-
-	if (opt_dot != None):
-		graph.output_dot(opt_dot, opt_title)
-
-	if (opt_catalog != None):
-		graph.output_catalog(opt_catalog)
+    if (opt_catalog != None):
+        catalog = mnetsuite.mnet_output_catalog(network)
+        catalog.generate(opt_catalog)
 
 
 def tracemac(argv):
-	trace = mnetsuite.mnet_tracemac()
+    opt_root_ip = None
+    opt_mac     = None
+    opt_conf    = DEFAULT_OPT_CONF
 
-	opt_root_ip = None
-	opt_conf = './mnet.conf'
-	opt_mac = None
+    try:
+        opts, args = getopt.getopt(argv, 'r:c:m:')
+    except getopt.GetoptError:
+        print_syntax()
+        return
+    for opt, arg in opts:
+        if (opt == '-r'):
+            opt_root_ip = arg
+        if (opt == '-c'):
+            opt_conf = arg
+        if (opt == '-m'):
+            opt_mac = arg
 
-	try:
-		opts, args = getopt.getopt(argv, 'r:c:m:')
-	except getopt.GetoptError:
-		print_syntax()
-		return
-	for opt, arg in opts:
-		if (opt == '-r'):
-			opt_root_ip = arg
-		if (opt == '-c'):
-			opt_conf = arg
-		if (opt == '-m'):
-			opt_mac = arg
+    if ((opt_root_ip == None) | (opt_mac == None)):
+        print_syntax()
+        print('Invalid arguments.')
+        return
 
-	if ((opt_root_ip == None) | (opt_mac == None)):
-		print_syntax()
-		print('Invalid arguments.')
-		return
+    print('     Config file: %s' % opt_conf)
+    print('       Root node: %s' % opt_root_ip)
+    print('     MAC address: %s' % opt_mac)
+    print('\n')
 
-	print('     Config file: %s' % opt_conf)
-	print('       Root node: %s' % opt_root_ip)
-	print('     MAC address: %s' % opt_mac)
+    # load the config
+    config = mnetsuite.mnet_config()
+    if (config.load(opt_conf) == 0):
+        return 0
 
-	print('\n\n')
+    trace = mnetsuite.mnet_tracemac(config)
 
-	mac = trace.parse_mac(opt_mac)
-	if (mac == None):
-		print('MAC address is invalid.')
-		return
+    # start
+    print('Start trace.')
+    print('------------')
 
-	# load config
-	trace.load_config(opt_conf)
+    ip = opt_root_ip
+    while (ip != None):
+        ip = trace.trace(ip, opt_mac)
+        print('------------')
 
-	# start
-	print('Start trace.')
-	print('------------')
+    print('Trace complete.\n')
 
-	ip = opt_root_ip
-	while (ip != None):
-		ip = trace.trace(ip, mac)
-		print('------------')
 
-	print('Trace complete.\n')
+def getmacs(argv):
+    opt_root_ip = None
+    opt_output  = None
+    opt_conf    = DEFAULT_OPT_CONF
+    opt_depth   = DEFAULT_OPT_DEPTH
+
+    try:
+        opts, args = getopt.getopt(argv, 'o:r:c:d:')
+    except getopt.GetoptError:
+        print_syntax()
+        return
+    for opt, arg in opts:
+        if (opt == '-r'):
+            opt_root_ip = arg
+        if (opt == '-d'):
+            opt_depth = int(arg)
+        if (opt == '-c'):
+            opt_conf = arg
+        if (opt == '-o'):
+            opt_output = arg
+
+    if ((opt_root_ip == None) | (opt_output == None)):
+        print_syntax()
+        print('Invalid arguments.')
+        return
+
+    print('     Config file: %s' % opt_conf)
+    print('     Output file: %s' % opt_output)
+    print('       Root node: %s' % opt_root_ip)
+    print('  Discover depth: %s' % opt_depth)
+    print('\n')
+
+    # load the config
+    config = mnetsuite.mnet_config()
+    if (config.load(opt_conf) == 0):
+        return 0
+
+    # start discovery
+    network = mnetsuite.mnet_network(config)
+    network.set_max_depth(opt_depth)
+    network.discover(opt_root_ip)
+
+    # get macs
+    mac = mnetsuite.mnet_mac(config)
+    macs = mac.get_macs_from_network_discovery(network, 1)
+
+    # generate output csv
+    if (opt_output):
+        mac.output_csv(opt_output)
 
 
 def generate_config():
-	conf = mnetsuite.config.mnet_config()
-	print('%s' % conf.generate_new())
+    conf = mnetsuite.config.mnet_config()
+    print('%s' % conf.generate_new())
 
 
 if __name__ == "__main__":
-	main(sys.argv[1:])
-
+    main(sys.argv[1:])
+    

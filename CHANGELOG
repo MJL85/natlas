@@ -1,10 +1,39 @@
 ---------------------
-MNet Suite
+mnet
 Michael Laforest
 mjlaforest@gmail.com
 
 CHANGE LOG
 --------------------
+
+v0.10 - 5/5/2018
+	- Ported to Python 3
+	- Cleaned up and refactored code
+	- Improved discovery
+	- Improved discovery console output
+	- Fixed VSS chassis detection; now finds correct serial# and platform
+	- All output referencing node IP now uses best IP instead of first found
+	- Try all known IPs for a node until one works; no longer fails on unreacable IPs (eg, VRFs/ACL blocks/etc)
+	- Default depth is now 100
+	- Added runtime to stdout
+	- Renamed 'graph' to 'diagram'
+
+	- Cisco ACL-style node matching (replaced config subnets/exclude with discover)
+	  - Added 'leaf' option to stop discovery beyond a matching node
+	  - Added 'include' option to stop discovery at a matching node
+
+	- Config option diagram/node_text replaces the below:
+	  - include_svi
+	  - include_lo
+	  - include_serials
+
+	diagram
+	- Changed -f option to -o
+	- If a LAG spans multiple devices (eg, Nexus) override expand_lag for that device
+	- Output can create multiple files. Ex: -o "file.{svg|png}" will create file.svg and file.png
+
+	getmacs
+	- Added as new module
 
 v0.9 -
 	graph
