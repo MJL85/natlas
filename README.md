@@ -5,7 +5,7 @@ Michael Laforest `<mjlaforest` *at* `gmail` *dot* `com>`
   
 Automated discovery and diagram tools using SNMP, CDP, and LLDP.
 
- ```# ./mnet.py diagram -r 10.75.0.1 -o .\network.svg```<br><br><br>*The above command will generate the diagram to the right.* | ![MNet-Diagram Ex3][diag3]
+ ```# ./mnet.py diagram -r 10.75.0.1 -o .\network.svg```<br><br><br>*The above command will generate the diagram to the right.* | ![MNet-Diagram Example1][diag1]
 :--- | --- 
  
 # Support
@@ -278,4 +278,4 @@ You can change the text inside each node by editing the config option `diagram\n
 ]
 ``` 
 
-[diag3]: http://i.imgur.com/i1dqM09.png "MNet-Graph Ex3"
+[diag1]: https://github.com/MJL85/mnet/blob/master/docs/images/mnet_example.PNG "Diagram 1"
