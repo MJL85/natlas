@@ -144,7 +144,7 @@ The toolset uses a JSON configuration file for common parameters.
 		".company.com"
 	],
 	"discover" : [
-        "permit ip 10.0.0.0/8",
+		"permit ip 10.0.0.0/8",
 		"permit host Router[1,2]",
 		"deny ip any",
 	],
@@ -156,8 +156,8 @@ The toolset uses a JSON configuration file for common parameters.
 		"get_vss_members" : 0,
 		"expand_stackwise" : 0,
 		"expand_vss" : 0,
-        "expand_lag" : 1,
-        "group_vpc" : 0
+		"expand_lag" : 1,
+		"group_vpc" : 0
     }
 	
 }
