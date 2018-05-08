@@ -31,11 +31,6 @@ from .node import *
 
 
 class mnet_network:
-    # def set_max_depth(self, depth)
-    # def discover(self, ip)
-    # def output_stdout(self)
-    # def output_dot(self, dot_file, title)
-    # def output_catalog(self, filename)
     DCODE_ROOT              = 0x01
     DCODE_ERR_SNMP          = 0x02
     DCODE_DISCOVERED        = 0x04

@@ -6,6 +6,13 @@ mjlaforest@gmail.com
 CHANGE LOG
 --------------------
 
+v0.10.1 -
+	- Added Python version check
+	- Changed 'config' to 'newconfig'
+	- Added 'showconfig' to display current config file to console
+	- Added 'checkconfig' to validate a config file
+	- Better error info when loading improperly formatted config files
+
 v0.10 - 5/5/2018
 	- Ported to Python 3
 	- Cleaned up and refactored code

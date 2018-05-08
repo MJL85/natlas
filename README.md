@@ -121,9 +121,12 @@ Example
 
 
 ### Config
-```
-# mnet.py config
-```
+| | |
+| --- | --- |
+| `# mnet.py newconfig` | Generate a new config file |
+| `# mnet.py showconfig [-c <config file>]` | Display the config file |
+| `# mnet.py checkconfig [-c <config file>]` | Validate the contents of the config file |
+
 # Configuration File
 The configuration file defines common parameters in a JSON format.
 ```

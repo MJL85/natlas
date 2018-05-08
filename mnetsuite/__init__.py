@@ -8,3 +8,5 @@ from .output_catalog import mnet_output_catalog
 from .tracemac  import mnet_tracemac
 from ._version  import __version__
 
+MNET_REQUIRES_PYTHON = (3, 6)
+

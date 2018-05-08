@@ -31,6 +31,7 @@ import os
 from timeit import default_timer as timer
 
 import mnetsuite
+from mnetsuite import MNET_REQUIRES_PYTHON
 
 DEFAULT_OPT_DEPTH   = 100
 DEFAULT_OPT_TITLE   = 'mnet Network Diagram'
@@ -54,7 +55,9 @@ def print_syntax():
                     '                  [-d <max depth>]\n'
                     '                  [-c <config file>]\n'
                     '\n'
-                    '  mnet.py config\n'
+                    '  mnet.py newconfig\n'
+                    '  mnet.py showconfig [-c <config file>]\n'
+                    '  mnet.py checkconfig [-c <config file>]\n'
             )
 
 
@@ -64,11 +67,22 @@ def print_banner():
     print('')
 
 
+def check_requirements():
+    return (sys.version_info > MNET_REQUIRES_PYTHON)
+
+
 def main(argv):
     opt_root_ip = None
     if (len(argv) < 1):
         print_banner()
         print_syntax()
+        return
+
+    if (argv[0] == 'version'):
+        print_banner()
+
+    if (check_requirements() == 0):
+        print('Running Python %s (requires %i.%i)' % (sys.version.split(' ')[0], MNET_REQUIRES_PYTHON[0], MNET_REQUIRES_PYTHON[1]))
         return
 
     start = timer()
@@ -82,8 +96,15 @@ def main(argv):
     elif (mod == 'getmacs'):
         print_banner()
         getmacs(argv[1:])
-    elif (mod == 'config'):
+    elif (mod == 'newconfig'):
         generate_config()
+        return
+    elif (mod == 'showconfig'):
+        show_config(argv[1:])
+        return
+    elif (mod == 'checkconfig'):
+        check_config(argv[1:])
+        return
     else:
         print_banner()
         print_syntax()
@@ -93,6 +114,7 @@ def main(argv):
     m=int((s-(h*3600))/60)
     s=s-(int(s/3600)*3600)-(m*60)
     print('Completed in %i:%i:%.2fs' % (h, m, s))
+
 
 def diagram(argv):
     opt_root_ip = None
@@ -146,9 +168,6 @@ def diagram(argv):
     network.discover_details()
 
     # outputs
-    #stdout = mnetsuite.mnet_output_stdout(network)
-    #stdout.generate()
-
     if (opt_output != None):
         diagram = mnetsuite.mnet_output_diagram(network)
         diagram.generate(opt_output, opt_title)
@@ -259,6 +278,43 @@ def getmacs(argv):
 def generate_config():
     conf = mnetsuite.config.mnet_config()
     print('%s' % conf.generate_new())
+
+
+def show_config(argv):
+    opt_conf = DEFAULT_OPT_CONF
+
+    try:
+        opts, args = getopt.getopt(argv, 'c:')
+    except getopt.GetoptError:
+        print_syntax()
+        sys.exit(1)
+    for opt, arg in opts:
+        if (opt == '-c'):
+            opt_conf = arg
+
+    try:
+        conf = open(opt_conf, 'r').read()
+    except:
+        print('Unable to open config file.')
+        return
+    print('%s' % conf)
+
+
+def check_config(argv):
+    opt_conf = DEFAULT_OPT_CONF
+
+    try:
+        opts, args = getopt.getopt(argv, 'c:')
+    except getopt.GetoptError:
+        print_syntax()
+        sys.exit(1)
+    for opt, arg in opts:
+        if (opt == '-c'):
+            opt_conf = arg
+
+    # load the config
+    config = mnetsuite.mnet_config()
+    config.validate_config(opt_conf)
 
 
 if __name__ == "__main__":
