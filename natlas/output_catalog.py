@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 '''
-        MNet Suite
+        natlas
         output_catalog.py
 
         Michael Laforest
@@ -24,16 +24,16 @@
         Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 '''
 
-from .config import mnet_config
-from .network import mnet_network
-from .output import mnet_output
+from .config import natlas_config
+from .network import natlas_network
+from .output import natlas_output
 from ._version import __version__
 
 
-class mnet_output_catalog:
+class natlas_output_catalog:
 
     def __init__(self, network):
-        mnet_output.__init__(self)
+        natlas_output.__init__(self)
         self.network = network
         self.config  = network.config
 

@@ -1,11 +1,11 @@
-# mnet
+# natlas
 
-mnet Suite - Tools for network professionals.  
+natlas - Network Atlas  
 Michael Laforest `<mjlaforest` *at* `gmail` *dot* `com>`
-  
+
 Automated discovery and diagram tools using SNMP, CDP, and LLDP.
 
- ```# ./mnet.py diagram -r 10.75.0.1 -o .\network.svg```<br><br><br>*The above command will generate the diagram to the right.* | ![MNet-Diagram Example1][diag1]
+ ```# ./natlas-cli.py diagram -r 10.75.0.1 -o .\network.svg```<br><br><br>*The above command will generate the diagram to the right.* | ![natlas-Diagram Main][diag-main]
 :--- | --- 
  
 # Support
@@ -14,15 +14,37 @@ If you use any of these tools or find them useful please consider donating.
 
 Donation Method | Address | QR Code
 --- | --- | ---
-Bitcoin (BTC) | 1HY3jPYVfE6YZbuYTYfMpazvSKRXjZDMbS  | ![1HY3jPYVfE6YZbuYTYfMpazvSKRXjZDMbS](https://github.com/MJL85/mnet/blob/master/docs/donate/BTC.png "Bitcoin (BTC)")
-Bitcoin Cash (BCH) | 1HSycjR3LAZxuLG34aEBbQdUSayPkh8XsH | ![1HSycjR3LAZxuLG34aEBbQdUSayPkh8XsH](https://github.com/MJL85/mnet/blob/master/docs/donate/BCH.png "Bitcoin Cash (BCH)")
+Bitcoin Cash (BCH) | 1HSycjR3LAZxuLG34aEBbQdUSayPkh8XsH | ![1HSycjR3LAZxuLG34aEBbQdUSayPkh8XsH](https://raw.github.com/MJL85/natlas/master/docs/donate/BCH.png "Bitcoin Cash (BCH)")
+Bitcoin (BTC) | 1HY3jPYVfE6YZbuYTYfMpazvSKRXjZDMbS  | ![1HY3jPYVfE6YZbuYTYfMpazvSKRXjZDMbS](https://raw.github.com/MJL85/natlas/master/docs/donate/BTC.png "Bitcoin (BTC)")
 
-# Tools
+# About
+
+natlas is a python application framework which includes a discovery engine, an API, and a front-end cli for running available modules.
+
+##### For Users
+The `natlas-cli.py` program allows you to browse and execute any natlas module, including, among others, the network discovery and diagram module.
+
+##### For Developers
+
+Copy `docs/template_module.py` to a new file in the `modules/` directory.
+Edit the function `mod_load()` to set the name and help properties for your module.
+The entry function for any module is `mod_entry()`.
+When creating a new module, natlas will create a new object and pass it to mod_entry().  From there the natlas API is available and includes functions such as:
+- discover_network()
+- query_node()
+- get_switch_vlans()
+
+Once saved, your module will automatically be listed in `natlas-cli.py list` and runnable.
+
+# Modules
 | Module | Description |
 | --- | --- |
-| Diagram | Discovers a network and generates a diagram based on CDP and LLDP neighbor information. |
-| TraceMAC | Attempts to locate a specific MAC address by recursively looking it up in switch CAM tables. |
-| GetMACS | Collect a list of all MAC addresses on the discovered network and generate a report. |
+| diagram | Discovers a network and generates a diagram based on CDP and LLDP neighbor information. |
+| get-mac-table | Collect a list of all MAC addresses on the discovered network and generate a report. |
+| get-arp-table | Collect a list of all ARP entries. |
+| get-hosts | Determine all hosts connected to one or all switches in the network. Includes MAC, IP, DNS name of each host, along with what switch and port it was found on. Can be exported to CSV. |
+| tracemac | Trace a MAC address through a layer 2 network. |
+| newconfig, showconfig, checkconfig | Modules to create, display, and validate natlas configuration files. |
 
 # Network Discovery  
   
@@ -70,14 +92,16 @@ Example
  
 | ACE Parameter | Description | Example |
 | --- | --- | --- |
-| host REGEX | The host can be matched against any regular expression string.  The host string is what is reported from CDP or LLDP. | `host Router-.*` |
-| ip CIDR | The ip can be matched against and CIDR. | `ip 10.50.31.0/24` |
+| host REGEX | The host can match any regular expression string.  The host string is what is reported from CDP or LLDP. | `host Router-.*` |
+| ip CIDR | The ip can be matched against and CIDR. | `ip 10\\.50\\.31\\.0/24` |
+| platform REGEX | The system platform or hardware model. | `platform .*3850.*` |
+| software REGEX | The system software version or IOS. | `software ^15\\.3` |
 
 # Command Reference
 
 ### Diagram
 ```
-# mnet.py diagram -r <root IP>
+# natlas-cli.py diagram -r <root IP>
                 -o <output file>
                [-d <max depth>]
                [-c <config file>]
@@ -91,41 +115,72 @@ Example
 | `-c <config file>` | The JSON configuration file to use. |
 | `-d <max depth>` | The maximum hop depth to discover, starting at the root node specified by `-r` |
 | `-t <diagram title>` | The title to give your generated network diagram. |
-| `-C <catalog file>` | If specified, mnet will generate a comma separated (CSV) catalog file with a list of all devices discovered. |
+| `-C <catalog file>` | If specified, natlas will generate a comma separated (CSV) catalog file with a list of all devices discovered. |
 
-### TraceMAC
+### get-mac-table
 ```
-# mnet.py tracemac -r <root IP>
-                 -m <MAC Address>
-                 [-c <config file>]
+# natlas-cli.py get-mac-table -n <node IP> -c <snmp v2 community> [-m <mac regex>] [-p <port regex>] [-v <vlan>]
 ```
 | Option | Description |
 | --- | --- |
-| `-r <root IP>` | IP address of the network node to start on. |
-| `-m <MAC Address>` | The MAC address to locate.  Can be in any form.  Ex: `11:22:33:44:55:66` or `112233445566` or `1122.3344.5566` |
-| `-c <config file>` | The JSON configuration file to use. |
+| `-n <node IP>` | IP address of the network node to get MAC addresses from. |
+| `-c <community>` | SNMPv2 community string. |
+| `-m <regex>` | Filter MAC addresses by this regex string. |
+| `-p <regex>` | Filter MAC addresses to only those on ports matching this regex string. |
+| `-v <regex>` | Filter MAC addresses to only those on VLANs matching this regex string. |
 
-### GetMACS
+### get-arp-table
 ```
-# mnet.py getmacs -r <root IP>
-                 -o <output CSV file>
-                 [-d <mac depth>]
-                 [-c <config file>]
+# natlas-cli.py get-arp-table -n <node IP> -c <snmp v2 community> [-s | -d] [-i <IP regex>] [-v <vlan regex>] [-m <mac regex>]
 ```
 | Option | Description |
 | --- | --- |
-| `-r <root IP>` | IP address of the network node to start on. |
-| `-o <output CSV file>` | The comma separated value (.csv) file that the output will be written to. |
-| `-d <max depth>` | The maximum hop depth to discover, starting at the root node specified by `-r` |
-| `-c <config file>` | The JSON configuration file to use. |
+| `-n <node IP>` | IP address of the network node to get ARP entries from. |
+| `-c <community>` | SNMPv2 community string. |
+| `-s` | Include static entries only |
+| `-d` | Include dyntamic entries only |
+| `-i <regex>` | Include entries with IP addresses that match regex pattern |
+| `-v <regex>` | Include entries with VLANs that match regex pattern |
+| `-m <regex>` | Include entries with MAC addreses that match regex pattern |
 
+### get-hosts
+
+get-hosts can either collect information from a single node or can do a network discovery and collect information from all discovered nodes.
+```
+# natlas-cli.py get-hosts -r <root IP> -c <config file> [-o <csv file>] [-d <discovery depth>]
+
+# natlas-cli.py get-hosts -n <node IP> [-r <router IP>] -C <snmp v2 community> [-v <vlan regex>] [-p <port regex>] [-o <csv file>]
+```
+| Option | Description |
+| --- | --- |
+| `-r <root IP>` | IP address to begin a network discovery. |
+| `-c <config file>` | natlas configuration file to use. |
+| `-o <csv file>` | Output CSV file path. |
+| `-d <depth>` | Maximum network discovery depth. |
+| --- | --- |
+| `-n <node IP>` | IP address of single layer2 or layer3 node to collect information from. |
+| `-r <router IP>` | IP address of the layer3 device to collect ARP entries from. If this is omitted then the IP from -n will be used. |
+| `-C <community>` | SNMPv2 community string. |
+| `-v <regex>` | Include entries with VLANs that match regex pattern |
+| `-p <regex>` | Include entries on ports that match regex pattern |
+| `-o <csv file>` | Output CSV file path. |
+
+### tracemac
+
+```
+# natlas-cli.py tracemac -n <starting node IP> -m <MAC address>
+```
+| Option | Description |
+| --- | --- |
+| `-n <starting node IP>` | IP address of node to begin layer 2 MAC trace. |
+| `-m <MAC address>` | MAC address to locate in the network. |
 
 ### Config
 | | |
 | --- | --- |
-| `# mnet.py newconfig` | Generate a new config file |
-| `# mnet.py showconfig [-c <config file>]` | Display the config file |
-| `# mnet.py checkconfig [-c <config file>]` | Validate the contents of the config file |
+| `# natlas-cli.py newconfig` | Generate a new config file |
+| `# natlas-cli.py showconfig [-c <config file>]` | Display the config file |
+| `# natlas-cli.py checkconfig [-c <config file>]` | Validate the contents of the config file |
 
 # Configuration File
 The configuration file defines common parameters in a JSON format.
@@ -179,7 +234,7 @@ The configuration file defines common parameters in a JSON format.
 | `group_vpc` | bool | `0` | If set to `1`, VPC peers will be grouped together on the diagram, otherwise they will not be clustered. |
 
 # Diagram
-mnet will attempt to collect the following information and include it in the generated diagram:
+natlas will attempt to collect the following information and include it in the generated diagram:
 + All devices (via CDP and LLDP)
 + Interface names
 + IP addresses
@@ -211,52 +266,21 @@ mnet will attempt to collect the following information and include it in the gen
 
 #### Examples
 
-Example 1
-![MNet-Diagram Ex1](http://i.imgur.com/Mny7PLl.png "MNet-Graph Ex1")
+Diagram Example 1
+![natlas-Diagram Ex1][diag-ex1]
 
-Example 2
-![MNet-Diagram Ex2](http://i.imgur.com/BuXnzWG.png "MNet-Graph Ex2")
+Diagram Example 2
+![natlas-Diagram Ex2][diag-ex2]
 
-Example 3
-![MNet-Diagram Ex3](http://i.imgur.com/i1dqM09.png "MNet-Graph Ex3")
+Diagram Example 3
+![natlas-Diagram Ex3][diag-ex3]
 
-# TraceMAC
+get-hosts Example 1
+![natlas-get-hosts Ex1][get-hosts-ex1]
 
-#### Examples
+tracemac Example 1
+![natlas-tracemac Ex1][tracemac-ex1]
 
-The below example shows a trace for MAC address `00:23:68:63:75:70` starting
-at node `10.10.0.3`.  The MAC address is found on switch `IDF3_D` on port
-`Gi0/11`.
-
-```
-# mnet.py tracemac -r 10.10.0.3 -m 0023.6863.7570
-MNet Suite v0.7
-Written by Michael Laforest <mjlaforest@gmail.com>
-
-     Config file: ./mnet.conf
-       Root node: 10.10.0.3
-     MAC address: 0023.6863.7570
-
-Start trace.
-------------
-IDF1_A (10.10.0.3)
-          VLAN: 1
-          Port: Gi1/3
-     Next Node: IDF1_B
-  Next Node IP: 10.10.0.2
-------------
-IDF1_B (10.10.0.2)
-          VLAN: 1
-          Port: Gi0/24
-     Next Node: IDF3_D
-  Next Node IP: 10.10.0.6
-------------
-IDF3_D (10.10.0.6)
-          VLAN: 1
-          Port: Gi0/11
-------------
-Trace complete.
-```
 # FAQ
 
 #### Q1 - My diagram is too large.  I only want to diagram part of my network.
@@ -264,7 +288,7 @@ Try changing the config `discover` ACL to narrow down the scope of your discover
   
 #### Q2 - Where is the config file?
 Create a new one with
-`# mnet.py config > mnet.conf`
+`# natlas-cli.py config > natlas.conf`
 
 #### Q3 - I need a diagram with less proprietary information. Can I get one without IPs or serial numbers?
 You can change the text inside each node by editing the config option `diagram\node_text`. Below is an example that would produce a minimal information diagram:
@@ -281,4 +305,11 @@ You can change the text inside each node by editing the config option `diagram\n
 ]
 ``` 
 
-[diag1]: https://github.com/MJL85/mnet/blob/master/docs/images/mnet_example.PNG "Diagram 1"
+[diag-main]: https://raw.github.com/MJL85/natlas/master/docs/images/diagram_example.PNG "Diagram Main"
+[diag-ex1]: https://raw.github.com/MJL85/natlas/master/docs/images/diagram_example1.PNG "Diagram Example 1"
+[diag-ex2]: https://raw.github.com/MJL85/natlas/master/docs/images/diagram_example2.PNG "Diagram Example 2"
+[diag-ex3]: https://raw.github.com/MJL85/natlas/master/docs/images/diagram_example2.PNG "Diagram Example 3"
+[get-hosts-ex1]: https://raw.github.com/MJL85/natlas/master/docs/images/get-hosts_example1.PNG "get-hosts Example 1"
+[tracemac-ex1]: https://raw.github.com/MJL85/natlas/master/docs/images/tracemac_example1.PNG "tracemac Example 1"
+
+

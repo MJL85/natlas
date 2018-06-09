@@ -1,8 +1,8 @@
 #!/usr/bin/python
 
 '''
-        MNet Suite
-        output.py
+        natlas
+        natlas-cli.py
 
         Michael Laforest
         mjlaforest@gmail.com
@@ -24,14 +24,23 @@
         Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 '''
 
-from .config import mnet_config
-from ._version import __version__
+import sys
+import getopt
+import os
+import natlas
 
-class mnet_output:
-    
-    def __init__(self):
-        self.type = 'base'
+def mod_load(mod):
+    mod.name         = 'newconfig'
+    mod.version      = '0.1'
+    mod.author       = 'Michael Laforest'
+    mod.authoremail  = 'mjlaforest@gmail.com'
+    mod.notimer      = 1
+    mod.about        = 'Generate a new config'
+    mod.syntax       = ''
+    mod.help         = 'Generate a new configuration file.'
+    mod.preload_conf = 0
+    return 1
 
-    def generate(self):
-        raise Exception('mnet_output.generate() called direct')
-
+def mod_entry(natlas_obj, argv):
+    print(natlas_obj.config_generate())
+    return natlas.RETURN_OK

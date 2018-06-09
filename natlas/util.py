@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 '''
-        MNet Suite
+        natlas
         util.py
 
         Michael Laforest
@@ -32,7 +32,7 @@ import struct
 import binascii
 
 from .snmp import *
-from .config import mnet_config
+from .config import natlas_config
 
 if (USE_NETADDR == 1):
     from netaddr import IPAddress, IPNetwork
@@ -78,21 +78,6 @@ class util:
     #
     # Shorten the port name string.
     #
-    def shorten_port_name(port):
-        if (port == OID_ERR):
-            return 'UNKNOWN'
-
-        if (port != None):
-            port = port.replace('TenGigabitEthernet', 'te')
-            port = port.replace('GigabitEthernet', 'gi')
-            port = port.replace('FastEthernet', 'fa')
-            port = port.replace('port-channel', 'po')
-            port = port.replace('Te', 'te')
-            port = port.replace('Gi', 'gi')
-            port = port.replace('Fa', 'fa')
-            port = port.replace('Po', 'po')
-
-        return port
 
 
     #

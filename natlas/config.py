@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 '''
-        MNet Suite
+        natlas
         config.py
 
         Michael Laforest
@@ -27,7 +27,7 @@
 import json
 import sys
 
-class mnet_config_diagram:
+class natlas_config_diagram:
     node_text_size      = 8
     link_text_size      = 7
     title_text_size     = 15
@@ -54,7 +54,7 @@ class mnet_config_diagram:
                             '<%loopback {lo.name} - {lo.ip}<br />%>' \
                             '<%svi VLAN {svi.vlan} - {svi.ip}<br />%>'
 
-class mnet_discover_acl:
+class natlas_discover_acl:
     '''
     Define an ACL entry for the 'discover' config block.
     Defined in the form:
@@ -65,7 +65,7 @@ class mnet_discover_acl:
         <str>    = string
     '''
     all_actions = [ ';', 'permit', 'deny', 'leaf', 'include' ]
-    all_types   = [ ';', 'ip', 'host' ]
+    all_types   = [ ';', 'ip', 'host', 'software', 'platform', 'serial' ]
 
     def __init__(self, str):
         self.action     = "nop"
@@ -88,12 +88,12 @@ class mnet_discover_acl:
     def __repr__(self):
         return '<%s %s %s>' % (self.action, self.type, self.str)
 
-class mnet_config:
+class natlas_config:
     def __init__(self):
         self.host_domains       = []
         self.snmp_creds         = []
         self.discover_acl       = []
-        self.diagram            = mnet_config_diagram()
+        self.diagram            = natlas_config_diagram()
 
     def load(self, filename):
         # load config
@@ -107,7 +107,7 @@ class mnet_config:
         # parse 'discover' block ACL entries
         for acl in json_data['discover']:
             try:
-                entry = mnet_discover_acl(acl)
+                entry = natlas_discover_acl(acl)
             except Exception as e:
                 print(e)
                 return 0
@@ -131,21 +131,10 @@ class mnet_config:
 
     def __load_json_conf(self, json_file):
         json_data = None
-
-        try:
-            fd = open(json_file)
-            json_data = fd.read()
-            fd.close()
-        except Exception as e:
-            print(e)
-            return None
-
-        try:
-            json_data = json.loads(json_data)
-        except ValueError as e:
-            print('Invalid JSON file; %s' % e)
-            return None
-
+        fd = open(json_file)
+        json_data = fd.read()
+        fd.close()
+        json_data = json.loads(json_data)
         return json_data
 
     def generate_new(self):
@@ -274,10 +263,10 @@ class mnet_config:
             if (len(ace) < 3):
                 print('ACE not enough params \'%s\'' % d)
                 return 0
-            if (ace[0] not in mnet_discover_acl.all_actions):
+            if (ace[0] not in natlas_discover_acl.all_actions):
                 print('ACE op \'%s\' not valid' % ace[0])
                 return 0
-            if (ace[1] not in mnet_discover_acl.all_types):
+            if (ace[1] not in natlas_discover_acl.all_types):
                 print('ACE cond \'%s\' not valid' % ace[1])
                 return 0
 

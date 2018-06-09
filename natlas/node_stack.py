@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 '''
-        MNet Suite
+        natlas
         node_stack.py
 
         Michael Laforest
@@ -29,7 +29,7 @@ from .util import *
 import sys
 
 
-class mnet_node_stack_member:
+class natlas_node_stack_member:
 
     def __init__(self):
         self.opts   = None
@@ -47,7 +47,7 @@ class mnet_node_stack_member:
         return self.__str__()
 
 
-class mnet_node_stack:
+class natlas_node_stack:
 
     def __init__(self, snmpobj = None, opts = None):
         self.members = []
@@ -93,7 +93,7 @@ class mnet_node_stack:
                 n = str(n)
                 if (n.startswith(OID_STACK_NUM + '.')):
                     # Get info on this stack member and add to the list
-                    m = mnet_node_stack_member()
+                    m = natlas_node_stack_member()
                     t = n.split('.')
                     idx = t[14]
 

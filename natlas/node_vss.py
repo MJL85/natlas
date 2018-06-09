@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 '''
-        MNet Suite
+        natlas
         node_vss.py
 
         Michael Laforest
@@ -29,7 +29,7 @@ from .snmp import *
 from .util import *
 
 
-class mnet_node_vss_member:
+class natlas_node_vss_member:
     def __init__(self):
         self.opts   = None
         self.ios    = None
@@ -42,9 +42,9 @@ class mnet_node_vss_member:
         return self.__str__()
 
 
-class mnet_node_vss:
+class natlas_node_vss:
     def __init__(self, snmpobj = None, opts = None):
-        self.members = [ mnet_node_vss_member(), mnet_node_vss_member() ]
+        self.members = [ natlas_node_vss_member(), natlas_node_vss_member() ]
         self.enabled = 0
         self.domain = None
         self.opts = opts

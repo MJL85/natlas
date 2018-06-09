@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 '''
-        MNet Suite
+        natlas
         network.py
 
         Michael Laforest
@@ -25,51 +25,63 @@
 '''
 
 from timeit import default_timer as timer
-from .config import mnet_config
+from .config import natlas_config
 from .util import *
 from .node import *
 
+DCODE_ROOT              = 0x01
+DCODE_ERR_SNMP          = 0x02
+DCODE_DISCOVERED        = 0x04
+DCODE_STEP_INTO         = 0x08
+DCODE_CDP               = 0x10
+DCODE_LLDP              = 0x20
+DCODE_INCLUDE           = 0x40
+DCODE_LEAF              = 0x80
 
-class mnet_network:
-    DCODE_ROOT              = 0x01
-    DCODE_ERR_SNMP          = 0x02
-    DCODE_DISCOVERED        = 0x04
-    DCODE_STEP_INTO         = 0x08
-    DCODE_CDP               = 0x10
-    DCODE_LLDP              = 0x20
-    DCODE_INCLUDE           = 0x40
-    DCODE_LEAF              = 0x80
+DCODE_ROOT_STR          = '[root]'
+DCODE_ERR_SNMP_STR      = '!'
+DCODE_DISCOVERED_STR    = '+'
+DCODE_STEP_INTO_STR     = '>'
+DCODE_CDP_STR           = '[ cdp]'
+DCODE_LLDP_STR          = '[lldp]'
+DCODE_INCLUDE_STR       = 'i'
+DCODE_LEAF_STR          = 'L'
 
-    DCODE_ROOT_STR          = '[root]'
-    DCODE_ERR_SNMP_STR      = '!'
-    DCODE_DISCOVERED_STR    = '+'
-    DCODE_STEP_INTO_STR     = '>'
-    DCODE_CDP_STR           = '[ cdp]'
-    DCODE_LLDP_STR          = '[lldp]'
-    DCODE_INCLUDE_STR       = 'i'
-    DCODE_LEAF_STR          = 'L'
-    
+NODE_KNOWN              = 0
+NODE_NEW                = 1
+NODE_NEWIP              = 2
+
+class natlas_network:
+
     def __init__(self, conf):
         self.root_node  = None
         self.nodes      = []
         self.max_depth  = 0
         self.config     = conf
+        self.verbose    = 1
 
     def __str__(self):
         return ('<root_node="%s", num_nodes=%i>' % (self.root_node.name, len(self.nodes)))
     def __repr__(self):
         return self.__str__()
 
-    
     def set_max_depth(self, depth):
         self.max_depth = depth
-
 
     def reset_discovered(self):
         for n in self.nodes:
             n.discovered = 0
 
+    def set_verbose(self, level):
+        '''
+        Set the verbose output level for discovery output.
 
+        Args:
+            Level       0 = no output
+                        1 = normal output
+        '''
+        self.verbose = level    
+    
     def discover(self, ip):
         '''
         Discover the network starting at the defined root node IP.
@@ -83,24 +95,28 @@ class mnet_network:
         to update the self.nodes[] array with more info.
         '''
 
-        print('Discovery codes:\n'                                      \
-              '    . depth             %s connection error\n'           \
-              '    %s discovering node  %s numerating adjacencies\n'    \
-              '    %s include node      %s leaf node\n' %
-              (mnet_network.DCODE_ERR_SNMP_STR,
-               mnet_network.DCODE_DISCOVERED_STR, mnet_network.DCODE_STEP_INTO_STR,
-               mnet_network.DCODE_INCLUDE_STR, mnet_network.DCODE_LEAF_STR)
-            )
+        if (self.verbose > 0):
+            print('Discovery codes:\n'                                      \
+                  '    . depth             %s connection error\n'           \
+                  '    %s discovering node  %s numerating adjacencies\n'    \
+                  '    %s include node      %s leaf node\n' %
+                  (DCODE_ERR_SNMP_STR,
+                   DCODE_DISCOVERED_STR, DCODE_STEP_INTO_STR,
+                   DCODE_INCLUDE_STR, DCODE_LEAF_STR)
+                )
 
-        print('Discovering network...')
+            print('Discovering network...')
 
         # Start the process of querying this node and recursing adjacencies.
         node, new_node = self.__query_node(ip, 'UNKNOWN')
         self.root_node = node
 
         if (node != None):
-            self.__print_step(node.ip[0], node.name, 0, mnet_network.DCODE_ROOT|mnet_network.DCODE_DISCOVERED)
+            self.nodes.append(node)
+            self.__print_step(node.ip[0], node.name, 0, DCODE_ROOT|DCODE_DISCOVERED)
             self.__discover_node(node, 0)
+        else:
+            return
 
         # we may have missed chassis info
         for n in self.nodes:
@@ -123,7 +139,8 @@ class mnet_network:
         if (self.root_node == None):
             return
 
-        print('\nCollecting node details...')
+        if (self.verbose > 0):
+            print('\nCollecting node details...')
 
         ni = 0
         for n in self.nodes:
@@ -133,8 +150,9 @@ class mnet_network:
             if (n.snmpobj.success == 0):
                 indicator = '!'
 
-            sys.stdout.write('[%i/%i]%s %s (%s)' % (ni, len(self.nodes), indicator, n.name, n.snmpobj._ip))
-            sys.stdout.flush()
+            if (self.verbose > 0):
+                sys.stdout.write('[%i/%i]%s %s (%s)' % (ni, len(self.nodes), indicator, n.name, n.snmpobj._ip))
+                sys.stdout.flush()
 
             # set what details to discover for this node
             n.opts.get_router        = True
@@ -156,11 +174,13 @@ class mnet_network:
             start = timer()
             n.query_node()
             end = timer()
-            print(' %.2f sec' % (end - start))
+            if (self.verbose > 0):
+                print(' %.2f sec' % (end - start))
 
         # There is some back fill information we can populate now that
         # we know all there is to know.
-        print('\nBack filling node details...')
+        if (self.verbose > 0):
+            print('\nBack filling node details...')
 
         for n in self.nodes:
             # Find and link VPC nodes together for easy reference later
@@ -173,93 +193,98 @@ class mnet_network:
 
 
     def __print_step(self, ip, name, depth, dcodes):
-        if (dcodes & mnet_network.DCODE_DISCOVERED):
+        if (self.verbose == 0):
+            return
+
+        if (dcodes & DCODE_DISCOVERED):
             sys.stdout.write('%-3i' % len(self.nodes))
         else:
             sys.stdout.write('   ')
 
-        if (dcodes & mnet_network.DCODE_INCLUDE):
+        if (dcodes & DCODE_INCLUDE):
             # flip this off cause we didn't even try
-            dcodes = dcodes & ~mnet_network.DCODE_ERR_SNMP
+            dcodes = dcodes & ~DCODE_ERR_SNMP
 
-        if   (dcodes & mnet_network.DCODE_ROOT):        sys.stdout.write( mnet_network.DCODE_ROOT_STR )
-        elif (dcodes & mnet_network.DCODE_CDP):         sys.stdout.write( mnet_network.DCODE_CDP_STR )
-        elif (dcodes & mnet_network.DCODE_LLDP):        sys.stdout.write( mnet_network.DCODE_LLDP_STR )
-        else:                                           sys.stdout.write('      ')
+        if   (dcodes & DCODE_ROOT):         sys.stdout.write( DCODE_ROOT_STR )
+        elif (dcodes & DCODE_CDP):          sys.stdout.write( DCODE_CDP_STR )
+        elif (dcodes & DCODE_LLDP):         sys.stdout.write( DCODE_LLDP_STR )
+        else:                               sys.stdout.write('      ')
 
         status = ''        
-        if   (dcodes & mnet_network.DCODE_ERR_SNMP):    status += mnet_network.DCODE_ERR_SNMP_STR
-        if   (dcodes & mnet_network.DCODE_LEAF):        status += mnet_network.DCODE_LEAF_STR
-        elif (dcodes & mnet_network.DCODE_INCLUDE):     status += mnet_network.DCODE_INCLUDE_STR
-        if   (dcodes & mnet_network.DCODE_DISCOVERED):  status += mnet_network.DCODE_DISCOVERED_STR
-        elif (dcodes & mnet_network.DCODE_STEP_INTO):   status += mnet_network.DCODE_STEP_INTO_STR
+        if   (dcodes & DCODE_ERR_SNMP):     status += DCODE_ERR_SNMP_STR
+        if   (dcodes & DCODE_LEAF):         status += DCODE_LEAF_STR
+        elif (dcodes & DCODE_INCLUDE):      status += DCODE_INCLUDE_STR
+        if   (dcodes & DCODE_DISCOVERED):   status += DCODE_DISCOVERED_STR
+        elif (dcodes & DCODE_STEP_INTO):    status += DCODE_STEP_INTO_STR
         sys.stdout.write('%3s' % status)
 
         for i in range(0, depth):
             sys.stdout.write('.')
 
         name = util.shorten_host_name(name, self.config.host_domains)
-        print('%s (%s)' % (name, ip))
+        if (self.verbose > 0):
+            print('%s (%s)' % (name, ip))
 
 
     def __query_node(self, ip, host):
         '''
-        Query this node for info about itself.
+        Query this node.
+        Return node details and if we already knew about it or if this is a new node.
+        Don't save the node to the known list, just return info about it.
 
         Args:
             ip:                 IP Address of the node.
             host:               Hostname of this known (if known from CDP/LLDP)
 
         Returns:
-            mnet_node:          Node of this object
-            int:                Newly discovered node=1, already discovered=0
+            natlas_node:        Node of this object
+            int:                NODE_NEW   = Newly discovered node
+                                NODE_NEWIP = Already knew about this node but not by this IP
+                                NODE_KNOWN = Already knew about this node
         '''
-
         host = util.shorten_host_name(host, self.config.host_domains)
-        node_new = 1
         node, node_updated = self.__get_known_node(ip, host)
 
         if (node == None):
             # new node
-            node        = mnet_node()
+            node        = natlas_node()
             node.name   = host
             node.ip     = [ip]
+            state       = NODE_NEW
         else:
             # existing node
-            node_new = 0
             if (node.snmpobj.success == 1):
                 # we already queried this node successfully - return it
-                return (node, node_new)
+                return (node, NODE_KNOWN)
+            # existing node but we couldn't connect before
+            if (node_updated == 1):
+                state = NODE_NEWIP
+            else:
+                state = NODE_KNOWN
+            node.name = host
 
         if (ip == 'UNKNOWN'):
-            if (node_new):
-                self.nodes.append(node)
-            return (node, node_new|node_updated)
-
-        node.name = host
+            return (node, state)
 
         # vmware ESX reports the IP as 0.0.0.0
         # LLDP can return an empty string for IPs.
         if ((ip == '0.0.0.0') | (ip == '')):
-            if (node_new):
-                self.nodes.append(node)
-            return (node, node_new|node_updated)
+            return (node, state)
 
         # find valid credentials for this node
         if (node.try_snmp_creds(self.config.snmp_creds) == 0):
-            if (node_new):
-                self.nodes.append(node)
-            return (node, node_new)
+            return (node, state)
 
         node.name = node.get_system_name(self.config.host_domains)
         if (node.name != host):
             # the hostname changed (cdp/lldp vs snmp)!
             # double check we don't already know about this node
-            if (node_new):
+            if (state == NODE_NEW):
                 node2, node_updated2 = self.__get_known_node(ip, host)
                 if ((node2 != None) & (node_updated2 == 0)):
-                    return (node, 0)
-                node_updated = node_updated2
+                    return (node, NODE_KNOWN)
+                if (node_updated2 == 1):
+                    state = NODE_NEWIP
 
         # Finally, if we still don't have a name, use the IP.
         # e.g. Maybe CDP/LLDP was empty and we dont have good credentials
@@ -267,12 +292,9 @@ class mnet_network:
         if ((node.name == None) | (node.name == '')):
             node.name = node.get_ipaddr()
 
-        # if this is a new non-updated node, save it to the list
-        if ((node_new == 1) & (node_updated == 0)):
-            self.nodes.append(node)
-
+        node.opts.get_serial = True     # CDP/LLDP does not report, need for extended ACL
         node.query_node()
-        return (node, 1)
+        return (node, state)
 
 
     def __get_known_node(self, ip, host):
@@ -281,7 +303,7 @@ class mnet_network:
         If found by HOST, add the IP if not already known.
 
         Return:
-            node:       Node if found
+            node:       Node, if found. Otherwise None.
             updated:    1=updated, 0=not updated
         '''
         # already known by IP ?
@@ -310,7 +332,7 @@ class mnet_network:
         until we reach the specified depth (>0).
 
         Args:
-            node:   mnet_node object to enumerate.
+            node:   natlas_node object to enumerate.
             depth:  The depth left that we can go further away from the root.
         '''
         if (node == None):
@@ -334,9 +356,9 @@ class mnet_network:
             return
 
         # print some info to stdout
-        dcodes = mnet_network.DCODE_STEP_INTO
+        dcodes = DCODE_STEP_INTO
         if (depth == 0):
-            dcodes |= mnet_network.DCODE_ROOT
+            dcodes |= DCODE_ROOT
         self.__print_step(node.ip[0], node.name, depth, dcodes)
 
         # get the cached snmp credentials
@@ -345,16 +367,12 @@ class mnet_network:
         # list of valid neighbors to discover next
         valid_neighbors = []
 
-        # get list of CDP neighbors
-        cdp_neighbors = node.get_cdp_neighbors()
-
-        # get list of LLDP neighbors
+        # get list of neighbors
+        cdp_neighbors  = node.get_cdp_neighbors()
         lldp_neighbors = node.get_lldp_neighbors()
-
-        if ((cdp_neighbors == None) & (lldp_neighbors == None)):
+        neighbors      = cdp_neighbors + lldp_neighbors
+        if (len(neighbors) == 0):
             return
-
-        neighbors = cdp_neighbors + lldp_neighbors
 
         for n in neighbors:
             # some neighbors may not advertise IP addresses - default them to 0.0.0.0
@@ -367,44 +385,44 @@ class mnet_network:
                 # deny inclusion of this node
                 continue
             
-            # the code to display to stdout about this discovery
-            dcodes = mnet_network.DCODE_DISCOVERED
-
-            child    = None
-            new_node = 1
+            dcodes = DCODE_DISCOVERED
+            child = None
             if (acl_action == 'include'):
                 # include this node but do not discover it
-                child    = mnet_node()
+                child    = natlas_node()
                 child.ip = [n.remote_ip]
-                dcodes  |= mnet_network.DCODE_INCLUDE
+                dcodes  |= DCODE_INCLUDE
             else:
                 # discover this node
-                child, new_node = self.__query_node(n.remote_ip, n.remote_name)
+                child, query_result = self.__query_node(n.remote_ip, n.remote_name)
 
             # if we couldn't pull info from SNMP fill in what we know
             if (child.snmpobj.success == 0):
                 child.name = util.shorten_host_name(n.remote_name, self.config.host_domains)
-                dcodes  |= mnet_network.DCODE_ERR_SNMP
+                dcodes  |= DCODE_ERR_SNMP
             
-            if (new_node == 1):
-                # report this new node to stdout.
-                # this could be a repeat either through
-                # cylical diagrams or redundant links.
-                if (acl_action == 'leaf'):          dcodes |= mnet_network.DCODE_LEAF
-                if (n.discovered_proto == 'cdp'):   dcodes |= mnet_network.DCODE_CDP
-                if (n.discovered_proto == 'lldp'):  dcodes |= mnet_network.DCODE_LLDP
+            # need to check the ACL again for extended ops (we have more info)
+            acl_action = self.__match_node_acl(n.remote_ip, n.remote_name, n.remote_plat, n.remote_ios, child.serial)
+            if (acl_action == 'deny'):
+                continue
+
+            if (query_result == NODE_NEW):
+                self.nodes.append(child)
+                if (acl_action == 'leaf'):          dcodes |= DCODE_LEAF
+                if (n.discovered_proto == 'cdp'):   dcodes |= DCODE_CDP
+                if (n.discovered_proto == 'lldp'):  dcodes |= DCODE_LLDP
                 self.__print_step(n.remote_ip, n.remote_name, depth+1, dcodes)
 
             # CDP/LLDP advertises the platform
-            child.plat = n.remote_platform
+            child.plat = n.remote_plat
             child.ios  = n.remote_ios
-
+            
             # add the discovered node to the link object and link to the parent
             n.node = child
             self.__add_link(node, n)
 
             # if we need to discover this node then add it to the list
-            if ((new_node == 1) & (acl_action != 'leaf') & (acl_action != 'include')):
+            if ((query_result == NODE_NEW) & (acl_action != 'leaf') & (acl_action != 'include')):
                 valid_neighbors.append(child)
 
         # discover the valid neighbors
@@ -412,15 +430,22 @@ class mnet_network:
             self.__discover_node(n, depth+1)
 
 
-    def __match_node_acl(self, ip, host):
+    def __match_node_acl(self, ip, host, platform=None, software=None, serial=None):
         for acl in self.config.discover_acl:
             if (acl.type == 'ip'):
-                # ___ ip ipaddr
                 if (self.__match_ip(ip, acl.str)):
                     return acl.action
             elif (acl.type == 'host'):
-                # ___ host hoststr
-                if (self.__match_host(host, acl.str)):
+                if (self.__match_strpattern(host, acl.str)):
+                    return acl.action
+            elif (acl.type == 'platform'):
+                if ((platform != None) and self.__match_strpattern(platform, acl.str)):
+                    return acl.action
+            elif (acl.type == 'software'):
+                if ((software != None) and self.__match_strpattern(software, acl.str)):
+                    return acl.action
+            elif (acl.type == 'serial'):
+                if ((serial != None) and self.__match_strpattern(serial, acl.str)):
                     return acl.action
         return 'deny'
 
@@ -442,10 +467,10 @@ class mnet_network:
         return 0
 
 
-    def __match_host(self, host, pattern):
-        if (host == '*'):
+    def __match_strpattern(self, str, pattern):
+        if (str == '*'):
             return 1
-        if (re.search(pattern, host)):
+        if (re.search(pattern, str)):
             return 1
         return 0
 

@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 '''
-        MNet Suite
+        natlas
         node.py
 
         Michael Laforest
@@ -26,16 +26,17 @@
 
 import sys
 
-from .snmp import *
-from .util import *
-from .node_stack import mnet_node_stack, mnet_node_stack_member
-from .node_vss   import mnet_node_vss,   mnet_node_vss_member
+from .snmp          import *
+from .util          import *
+from .node_stack    import natlas_node_stack, natlas_node_stack_member
+from .node_vss      import natlas_node_vss,   natlas_node_vss_member
+from .mac           import natlas_mac
 
-class mnet_node_link:
+class natlas_node_link:
     '''
     Generic link to another node.
     CDP and LLDP neighbors are discovered
-    and returned as mnet_node_link objects.
+    and returned as natlas_node_link objects.
     '''
 
     def __init__(self):
@@ -65,66 +66,109 @@ class mnet_node_link:
         self.discovered_proto           = None
 
     def __str__(self):
-        return ('<local_port=%s,node.name=%s,remote_port=%s>' % (self.local_port, self.node.name, self.remote_port))
+        return (
+                'link_type              = %s\n' \
+                'remote_ip              = %s\n' \
+                'remote_name            = %s\n' \
+                'vlan                   = %s\n' \
+                'local_native_vlan      = %s\n' \
+                'local_allowed_vlans    = %s\n' \
+                'remote_native_vlan     = %s\n' \
+                'remote_allowed_vlans   = %s\n' \
+                'local_port             = %s\n' \
+                'remote_port            = %s\n' \
+                'local_lag              = %s\n' \
+                'remote_lag             = %s\n' \
+                'local_lag_ips          = %s\n' \
+                'remote_lag_ips         = %s\n' \
+                'local_if_ip            = %s\n' \
+                'remote_if_ip           = %s\n' \
+                'remote_platform        = %s\n' \
+                'remote_ios             = %s\n' \
+                'remote_mac             = %s\n' \
+                'discovered_proto       = %s\n' \
+                % (self.link_type, self.remote_ip, self.remote_name, self.vlan, self.local_native_vlan,
+                    self.local_allowed_vlans, self.remote_native_vlan, self.remote_allowed_vlans,
+                    self.local_port, self.remote_port, self.local_lag, self.remote_lag, self.local_lag_ips,
+                    self.remote_lag_ips, self.local_if_ip, self.remote_if_ip, self.remote_platform, self.remote_ios,
+                    self.remote_mac, self.discovered_proto))
     def __repr__(self):
-        return self.__str__()
+        return ('<local_port="%s",remote_name="%s",remote_port="%s">' % (self.local_port, self.remote_name, self.remote_port))
 
 
-class mnet_node_svi:
+class natlas_node_svi:
     def __init__(self, vlan):
         self.vlan   = vlan
         self.ip     = []
     def __str__(self):
-        return ('<vlan=%s,ip=%s>' % (self.vlan, self.ip))
+        return ('VLAN = %s\nIP   = %s' % (self.vlan, self.ip))
     def __repr__(self):
-        return self.__str__()
+        return ('<vlan=%s,ip="%s">' % (self.vlan, self.ip))
 
 
-class mnet_node_lo:
+class natlas_node_lo:
     def __init__(self, name, ips):
         self.name = name.replace('Loopback', 'lo')
         self.ips = ips
     def __str__(self):
-        return ('<name=%s,ips=%s>' % (self.name, self.ips))
+        return ('Name = %s\nIPs  = %s' % (self.name, self.ips))
+    def __repr__(self):
+        return ('<name="%s",ips=%s>' % (self.name, self.ips))
+
+
+class natlas_vlan:
+    def __init__(self, vid, name):
+        self.id     = vid
+        self.name   = name
+    def __str__(self):
+        return ('<vid=%s,name="%s">' % (self.id, self.name))
     def __repr__(self):
         return self.__str__()
 
+class natlas_arp:
+    def __init__(self, ip, mac, interf, arp_type):
+        self.ip         = ip
+        self.mac        = mac
+        self.interf     = interf
+        self.arp_type   = arp_type
+    def __str__(self):
+        return ('<ip="%s",mac="%s",interf="%s",arp_type="%s">' % (self.ip, self.mac, self.interf, self.arp_type))
+    def __repr__(self):
+        return self.__str__()
 
-class mnet_node:
-
+class natlas_node:
     class _node_opts:
-
         def __init__(self):
             self.reset()
 
-        def reset(self):
-            self.get_name           = False
-            self.get_ip             = False
-            self.get_plat           = False
-            self.get_ios            = False
-            self.get_router         = False
-            self.get_ospf_id        = False
-            self.get_bgp_las        = False
-            self.get_hsrp_pri       = False
-            self.get_hsrp_vip       = False
-            self.get_serial         = False
-            self.get_stack          = False
-            self.get_stack_details  = False
-            self.get_vss            = False
-            self.get_vss_details    = False
-            self.get_svi            = False
-            self.get_lo             = False
-            self.get_bootf          = False
-            self.get_chassis_info   = False
-            self.get_vpc            = False
+        def reset(self, setting=False):
+            self.get_name           = setting
+            self.get_ip             = setting
+            self.get_plat           = setting
+            self.get_ios            = setting
+            self.get_router         = setting
+            self.get_ospf_id        = setting
+            self.get_bgp_las        = setting
+            self.get_hsrp_pri       = setting
+            self.get_hsrp_vip       = setting
+            self.get_serial         = setting
+            self.get_stack          = setting
+            self.get_stack_details  = setting
+            self.get_vss            = setting
+            self.get_vss_details    = setting
+            self.get_svi            = setting
+            self.get_lo             = setting
+            self.get_bootf          = setting
+            self.get_chassis_info   = setting
+            self.get_vpc            = setting
 
-    def __init__(self):
-        self.opts               = mnet_node._node_opts()
-        self.snmpobj            = mnet_snmp()
+    def __init__(self, ip=None):
+        self.opts               = natlas_node._node_opts()
+        self.snmpobj            = natlas_snmp()
         self.links              = []
         self.discovered         = 0
         self.name               = None
-        self.ip                 = None
+        self.ip                 = [ip]
         self.plat               = None
         self.ios                = None
         self.router             = None
@@ -139,8 +183,9 @@ class mnet_node:
         self.vpc_peerlink_if    = None
         self.vpc_peerlink_node  = None
         self.vpc_domain         = None
-        self.stack              = mnet_node_stack()
-        self.vss                = mnet_node_vss()
+        self.stack              = natlas_node_stack()
+        self.vss                = natlas_node_vss()
+        
         self.cdp_vbtbl          = None
         self.ldp_vbtbl          = None
         self.link_type_vbtbl    = None
@@ -152,13 +197,41 @@ class mnet_node:
         self.ethif_vbtbl        = None
         self.trk_allowed_vbtbl  = None
         self.trk_native_vbtbl   = None
-
+        self.vpc_vbtbl          = None
+        self.vlan_vbtbl         = None
+        self.vlandesc_vbtbl     = None
+        self.arp_vbtbl          = None
 
     def __str__(self):
+        return (
+                'Name       = %s\n'         \
+                'IP         = %s\n'         \
+                'Platform   = %s\n'         \
+                'IOS        = %s\n'         \
+                'Router     = %s\n'         \
+                'OSPF_ID    = %s\n'         \
+                'BGP_LAS    = %s\n'         \
+                'HSRP_PRI   = %s\n'         \
+                'HSRP_VIP   = %s\n'         \
+                'Serials    = %s\n'         \
+                'Bootfile   = %s\n'         \
+                'SVIs       = %s\n'         \
+                'Loopbacks  = %s\n'         \
+                'VPC_Peerlink_If    = %s\n' \
+                'VPC_Peerlink_Node  = %s\n' \
+                'VPC_Domain         = %s\n' \
+                'Stack      = %s\n'         \
+                'VSS        = %s\n'
+                'Links      = %s\n'
+                % (self.name, self.ip, self.plat, self.ios, self.router,
+                    self.ospf_id, self.bgp_las, self.hsrp_pri, self.hsrp_vip,
+                    self.serial, self.bootfile, self.svis, self.loopbacks,
+                    self.vpc_peerlink_if, self.vpc_peerlink_node, self.vpc_domain,
+                    self.stack, self.vss, self.links)
+        )
+    def __repr__(self):
         return ('<name=%s, ip=%s, plat=%s, ios=%s, serial=%s, router=%s, vss=%s, stack=%s>' %
                 (self.name, self.ip, self.plat, self.ios, self.serial, self.router, self.vss, self.stack))
-    def __repr__(self):
-        return self.__str__()
 
 
     def add_link(self, link):
@@ -187,6 +260,9 @@ class mnet_node:
 
         snmpobj = self.snmpobj
 
+        if (self.opts.get_name == True):
+            self.name = self.get_system_name([])
+
         # router
         if (self.opts.get_router == True):
             if (self.router == None):
@@ -213,11 +289,11 @@ class mnet_node:
 
         # stack
         if (self.opts.get_stack):
-            self.stack = mnet_node_stack(snmpobj, self.opts)
+            self.stack = natlas_node_stack(snmpobj, self.opts)
 
         # vss
         if (self.opts.get_vss):
-            self.vss = mnet_node_vss(snmpobj, self.opts)
+            self.vss = natlas_node_vss(snmpobj, self.opts)
 
         # serial
         if ((self.opts.get_serial == 1) & (self.stack.count == 0) & (self.vss.enabled == 0)):
@@ -235,7 +311,7 @@ class mnet_node:
                 for n, v in row:
                     n = str(n)
                     vlan = n.split('.')[14]
-                    svi = mnet_node_svi(vlan)
+                    svi = natlas_node_svi(vlan)
                     svi_ips = self.__get_cidrs_from_ifidx(v)
                     svi.ip.extend(svi_ips)
                     self.svis.append(svi)
@@ -254,7 +330,7 @@ class mnet_node:
                         ifidx = n.split('.')[10]
                         lo_name = snmpobj.cache_lookup(self.ethif_vbtbl, OID_ETH_IF_DESC + '.' + ifidx)
                         lo_ips = self.__get_cidrs_from_ifidx(ifidx)
-                        lo = mnet_node_lo(lo_name, lo_ips)
+                        lo = natlas_node_lo(lo_name, lo_ips)
                         self.loopbacks.append(lo)
 
         # bootfile
@@ -316,7 +392,8 @@ class mnet_node:
 
     #
     # Get a list of CDP neighbors.
-    # Returns a list of mnet_node_link's
+    # Returns a list of natlas_node_link's.
+    # Will always return an array.
     #
     def get_cdp_neighbors(self):
         neighbors = []
@@ -326,7 +403,7 @@ class mnet_node:
         self.cdp_vbtbl = snmpobj.get_bulk(OID_CDP)
         if (self.cdp_vbtbl == None):
             print('No CDP Neighbors Found.')
-            return None
+            return []
 
         # cache some common MIB trees
         self.__cache_common_mibs()
@@ -351,7 +428,7 @@ class mnet_node:
 
                 # get remote port
                 rport = snmpobj.cache_lookup(self.cdp_vbtbl, OID_CDP_DEVPORT + '.' + ifidx + '.' + ifidx2)
-                rport = util.shorten_port_name(rport)
+                rport = self.shorten_port_name(rport)
 
                 # get remote platform
                 rplat = snmpobj.cache_lookup(self.cdp_vbtbl, OID_CDP_DEVPLAT + '.' + ifidx + '.' + ifidx2)
@@ -381,7 +458,8 @@ class mnet_node:
 
     #
     # Get a list of LLDP neighbors.
-    # Returns a list of mnet_node_link's
+    # Returns a list of natlas_node_link's
+    # Will always return an array.
     #
     def get_lldp_neighbors(self):
         neighbors = []
@@ -390,7 +468,7 @@ class mnet_node:
         self.lldp_vbtbl = snmpobj.get_bulk(OID_LLDP)
         if (self.lldp_vbtbl == None):
             print('No LLDP Neighbors Found.')
-            return None
+            return []
 
         self.__cache_common_mibs()
 
@@ -416,7 +494,7 @@ class mnet_node:
                 lport = self.__get_ifname(ifidx)
 
                 rport = snmpobj.cache_lookup(self.lldp_vbtbl, OID_LLDP_DEVPORT + '.' + ifidx + '.' + ifidx2)
-                rport = util.shorten_port_name(rport)
+                rport = self.shorten_port_name(rport)
 
                 devid = snmpobj.cache_lookup(self.lldp_vbtbl, OID_LLDP_DEVID + '.' + ifidx + '.' + ifidx2)
                 try:
@@ -477,7 +555,7 @@ class mnet_node:
         # get IP address
         lifips = self.__get_cidrs_from_ifidx(ifidx)
 
-        link                        = mnet_node_link()
+        link                        = natlas_node_link()
         link.link_type              = link_type
         link.vlan                   = vlan
         link.local_native_vlan      = native_vlan
@@ -599,9 +677,11 @@ class mnet_node:
     def __get_ifname(self, ifidx):
         if ((ifidx == None) | (ifidx == OID_ERR)):
             return 'UNKNOWN'
+        if (self.ifname_vbtbl == None):
+            self.ifname_vbtbl = self.snmpobj.get_bulk(OID_IFNAME)
 
         str = self.snmpobj.cache_lookup(self.ifname_vbtbl, OID_IFNAME + '.' + ifidx)
-        str = util.shorten_port_name(str)
+        str = self.shorten_port_name(str)
 
         return str or 'UNKNOWN'
 
@@ -630,7 +710,6 @@ class mnet_node:
 
         return img
 
-
     def get_ipaddr(self):
         '''
         Return the best IP address for this device.
@@ -641,16 +720,17 @@ class mnet_node:
         # Loopbacks - first interface
         if (len(self.loopbacks)):
             ips = self.loopbacks[0].ips
-            ips.sort()
-            return util.strip_slash_masklen(ips[0])
+            if (len(ips)):
+                ips.sort()
+                return util.strip_slash_masklen(ips[0])
 
         # SVIs + all known - lowest address
         ips = []
         for svi in self.svis:
             ips.extend(svi.ip)
         ips.extend(self.ip)
-        ips.sort()
         if (len(ips)):
+            ips.sort()
             return util.strip_slash_masklen(ips[0])
 
         return ''
@@ -661,12 +741,74 @@ class mnet_node:
         If VPC is enabled,
         Return the VPC domain and interface name of the VPC peerlink.
         '''
-        tbl = self.snmpobj.get_bulk(OID_VPC_PEERLINK_IF)
-        if ((tbl == None) | (len(tbl) == 0)):
+        if (self.vpc_vbtbl == None):
+            self.vpc_vbtbl = self.snmpobj.get_bulk(OID_VPC_PEERLINK_IF)
+        if ((self.vpc_vbtbl == None) | (len(self.vpc_vbtbl) == 0)):
             return (None, None)
-        domain = mnet_snmp.get_last_oid_token(tbl[0][0][0])
-        ifidx  = str(tbl[0][0][1])
+        domain = natlas_snmp.get_last_oid_token(self.vpc_vbtbl[0][0][0])
+        ifidx  = str(self.vpc_vbtbl[0][0][1])
         ifname = self.snmpobj.cache_lookup(ifarr, OID_ETH_IF_DESC + '.' + ifidx)
-        ifname = util.shorten_port_name(ifname)
+        ifname = self.shorten_port_name(ifname)
         return (domain, ifname)
+
+    def get_vlans(self):
+        # use cache if possible
+        if (self.vlan_vbtbl == None):
+            self.vlan_vbtbl     = self.snmpobj.get_bulk(OID_VLANS)
+        if (self.vlandesc_vbtbl == None):
+            self.vlandesc_vbtbl = self.snmpobj.get_bulk(OID_VLAN_DESC)
+        arr = []
+        i = 0
+        for vlan_row in self.vlan_vbtbl:
+            for vlan_n, vlan_v in vlan_row:
+                # get VLAN ID from OID
+                vlan = natlas_snmp.get_last_oid_token(vlan_n)
+                if (vlan >= 1002):
+                    continue
+                arr.append(natlas_vlan(vlan, str(self.vlandesc_vbtbl[i][0][1])))
+                i = i + 1
+        return arr
+
+    def get_arp_table(self):
+        # use cache if possible
+        if (self.arp_vbtbl == None):
+            self.arp_vbtbl = self.snmpobj.get_bulk(OID_ARP)
+        arr = []
+        for r in self.arp_vbtbl:
+            for n, v in r:
+                n = str(n)
+                if (n.startswith(OID_ARP_VLAN)):
+                    tok    = n.split('.')
+                    ip     = '.'.join(tok[11:])
+                    interf = self.__get_ifname(str(v))
+                    mach   = self.snmpobj.cache_lookup(self.arp_vbtbl, OID_ARP_MAC+'.'+str(v)+'.'+ip)
+                    mac    = natlas_mac.mac_hex_to_ascii(mach, 1) 
+                    atype  = self.snmpobj.cache_lookup(self.arp_vbtbl, OID_ARP_TYPE+'.'+str(v)+'.'+ip)
+
+                    atype = int(atype)
+                    type_str = 'unknown'
+                    if   (atype == ARP_TYPE_OTHER):     type_str = 'other'
+                    elif (atype == ARP_TYPE_INVALID):   type_str = 'invalid'
+                    elif (atype == ARP_TYPE_DYNAMIC):   type_str = 'dynamic'
+                    elif (atype == ARP_TYPE_STATIC):    type_str = 'static'
+
+                    arr.append(natlas_arp(ip, mac, interf, type_str))
+        return arr if arr else []
+
+
+    def shorten_port_name(self, port):
+        if (port == OID_ERR):
+            return 'UNKNOWN'
+
+        if (port != None):
+            port = port.replace('TenGigabitEthernet', 'te')
+            port = port.replace('GigabitEthernet', 'gi')
+            port = port.replace('FastEthernet', 'fa')
+            port = port.replace('port-channel', 'po')
+            port = port.replace('Te', 'te')
+            port = port.replace('Gi', 'gi')
+            port = port.replace('Fa', 'fa')
+            port = port.replace('Po', 'po')
+
+        return port
 

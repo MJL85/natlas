@@ -1,17 +1,49 @@
 ---------------------
-mnet
+natlas
 Michael Laforest
 mjlaforest@gmail.com
 
 CHANGE LOG
 --------------------
 
-v0.10.1 -
+v0.11 -
+	- Rebranded to natlas
+	- Reorganized into framework with dynamically loadable modules
 	- Added Python version check
-	- Changed 'config' to 'newconfig'
-	- Added 'showconfig' to display current config file to console
-	- Added 'checkconfig' to validate a config file
 	- Better error info when loading improperly formatted config files
+	- Added ACL match criteria for discovery: platform, serial, software
+	- FIX: Platform / IOS / Serial sometimes not captured if SNMP was not available but CDP/LLDP had it
+	- FIX: SNMP timeout could cause crash
+
+	modules
+	- Renamed: config -> newconfig
+	- Added: showconfig
+	- Added: checkconfig
+	- Added: get-mac-table
+	- Added: get-arp-table
+	- Added: get-hosts
+	- Added: tracemac
+	- Removed: output_stdout
+
+	API
+	- Created the initial natlas API
+	- Added: config_generate()
+	- Added: config_validate()
+	- Added: config_load()
+	- Added: snmp_add_credential()
+	- Added: set_discover_maxdepth()
+	- Added: set_verbose()
+	- Added: discover_network()
+	- Added: new_node()
+	- Added: query_node()
+	- Added: write_diagram() 
+	- Added: write_catalog() 
+	- Added: get_switch_vlans()
+	- Added: get_switch_macs()
+	- Added: get_discovered_nodes()	
+	- Added: get_node_ip()
+	- Added: get_arp_table()
+	- Added: get_neighbors()
 
 v0.10 - 5/5/2018
 	- Ported to Python 3

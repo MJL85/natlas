@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 '''
-        MNet Suite
+        natlas
         snmp.py
 
         Michael Laforest
@@ -95,12 +95,18 @@ OID_ENTPHYENTRY_PLAT     = '1.3.6.1.2.1.47.1.1.1.1.13'              # + .modidx
 
 OID_VPC_PEERLINK_IF     = '1.3.6.1.4.1.9.9.807.1.4.1.1.2'
 
-# mnet-tracemac
 OID_VLANS               = '1.3.6.1.4.1.9.9.46.1.3.1.1.2'
+OID_VLAN_DESC           = '1.3.6.1.4.1.9.9.46.1.3.1.1.4'
 OID_VLAN_CAM            = '1.3.6.1.2.1.17.4.3.1.1'
 
 OID_BRIDGE_PORTNUMS     = '1.3.6.1.2.1.17.4.3.1.2'
 OID_IFINDEX             = '1.3.6.1.2.1.17.1.4.1.2'
+
+OID_ARP                 = '1.3.6.1.2.1.4.22.1'
+OID_ARP_VLAN            = '1.3.6.1.2.1.4.22.1.1'
+OID_ARP_MAC             = '1.3.6.1.2.1.4.22.1.2'
+OID_ARP_IP              = '1.3.6.1.2.1.4.22.1.3'
+OID_ARP_TYPE            = '1.3.6.1.2.1.4.22.1.4'
 
 OID_ERR                 = 'No Such Object currently exists at this OID'
 OID_ERR_INST            = 'No Such Instance currently exists at this OID'
@@ -119,12 +125,13 @@ ENTPHYCLASS_PORT        = 10
 ENTPHYCLASS_STACK       = 11
 ENTPHYCLASS_PDU         = 12
 
-class mnet_snmp:
-    success = 0
-    ver = 0
-    v2_community = None
-    _ip = None
+# ARP TYPES
+ARP_TYPE_OTHER          = 1
+ARP_TYPE_INVALID        = 2
+ARP_TYPE_DYNAMIC        = 3
+ARP_TYPE_STATIC         = 4
 
+class natlas_snmp:
     def __init__(self, ip='0.0.0.0'):
         self.success = 0
         self.ver = 0
