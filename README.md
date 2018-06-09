@@ -305,7 +305,7 @@ You can change the text inside each node by editing the config option `diagram\n
 ]
 ``` 
 
-[diag-main]: https://raw.github.com/MJL85/natlas/blob/master/docs/images/diagram_example.png "Diagram Main"
+[diag-main]: https://raw.github.com/MJL85/natlas/master/docs/images/diagram_example.png "Diagram Main"
 [diag-ex1]: https://raw.github.com/MJL85/natlas/master/docs/images/diagram_example1.png "Diagram Example 1"
 [diag-ex2]: https://raw.github.com/MJL85/natlas/master/docs/images/diagram_example2.png "Diagram Example 2"
 [diag-ex3]: https://raw.github.com/MJL85/natlas/master/docs/images/diagram_example2.png "Diagram Example 3"
