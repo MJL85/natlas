@@ -266,19 +266,19 @@ natlas will attempt to collect the following information and include it in the g
 
 # Examples
 
-Diagram Example 1
+#### Diagram Example 1
 ![natlas-Diagram Ex1][diag-ex1]
 
-Diagram Example 2
+#### Diagram Example 2
 ![natlas-Diagram Ex2][diag-ex2]
 
-Diagram Example 3
+#### Diagram Example 3
 ![natlas-Diagram Ex3][diag-ex3]
 
-get-hosts Example 1
+#### get-hosts Example 1
 ![natlas-get-hosts Ex1][get-hosts-ex1]
 
-tracemac Example 1
+#### tracemac Example 1
 ![natlas-tracemac Ex1][tracemac-ex1]
 
 # FAQ
@@ -308,7 +308,7 @@ You can change the text inside each node by editing the config option `diagram\n
 [diag-main]: https://raw.github.com/MJL85/natlas/master/docs/images/diagram_example.png "Diagram Main"
 [diag-ex1]: https://raw.github.com/MJL85/natlas/master/docs/images/diagram_example1.png "Diagram Example 1"
 [diag-ex2]: https://raw.github.com/MJL85/natlas/master/docs/images/diagram_example2.png "Diagram Example 2"
-[diag-ex3]: https://raw.github.com/MJL85/natlas/master/docs/images/diagram_example2.png "Diagram Example 3"
+[diag-ex3]: https://raw.github.com/MJL85/natlas/master/docs/images/diagram_example3.png "Diagram Example 3"
 [get-hosts-ex1]: https://raw.github.com/MJL85/natlas/master/docs/images/get-hosts_example1.png "get-hosts Example 1"
 [tracemac-ex1]: https://raw.github.com/MJL85/natlas/master/docs/images/tracemac_example1.png "tracemac Example 1"
 
