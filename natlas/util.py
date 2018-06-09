@@ -76,11 +76,6 @@ class util:
 
 
     #
-    # Shorten the port name string.
-    #
-
-
-    #
     # Shorten the hostname by removing any defined domain suffixes.
     #
     def shorten_host_name(_host, domains):

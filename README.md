@@ -264,7 +264,7 @@ natlas will attempt to collect the following information and include it in the g
   + If a link says *P:gi0/1* , *C:gi1/4* then the parent node's connection is on port gi0/1 and the child node's connection is on port gi1/4.
   + If the link is part of an Etherchannel the etherchannel's interface name will also be shown.  Since an etherchannel interface is locally significiant, a *P:* and *C:* will also be shown if available.
 
-#### Examples
+# Examples
 
 Diagram Example 1
 ![natlas-Diagram Ex1][diag-ex1]
@@ -288,7 +288,7 @@ Try changing the config `discover` ACL to narrow down the scope of your discover
   
 #### Q2 - Where is the config file?
 Create a new one with
-`# natlas-cli.py config > natlas.conf`
+`# natlas-cli.py newconfig > natlas.conf`
 
 #### Q3 - I need a diagram with less proprietary information. Can I get one without IPs or serial numbers?
 You can change the text inside each node by editing the config option `diagram\node_text`. Below is an example that would produce a minimal information diagram:
