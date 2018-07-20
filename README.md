@@ -187,6 +187,7 @@ The configuration file defines common parameters in a JSON format.
 ```
 {
 	"snmp" : [
+		{ "community":"SNMPv3Example",  "ver":3 , "v3Username":"testuser", "v3AuthKey":"abc12345678", "v3PrivKey":"12345678abc", "v3AuthProtocol":"SHA", "v3PrivProtocol":"AES128"},
 		{ "community":"private",	"ver":2 },
 		{ "community":"public",		"ver":2 }
 	],
@@ -219,6 +220,17 @@ The configuration file defines common parameters in a JSON format.
 | `snmp` | Defines a list of SNMP credentials.  When connecting to a node, each of these credentials is tried in order until one is successful. |
 | `discover` | Defines a Cisco-style ACL. See the `Network Discovery` section. |
 | `diagram` | Defines values used by the diagram module.  Detailed below in the *Diagram block* table. |
+
+### SNMPv3 Options
+| Option | Description |
+| --- | --- |
+| `community` | Name of SNMPv3 credentials.  It doesn't affect the SNMPv3 fucntionality but is used as a reference in case an error occurs. |
+| `ver` | For SNMPv3, always set to 3. |
+| `v3Username` | SNMPv3 Username |
+| `v3AuthKey` | (optional) Authentication Key - *Required if v3AuthProtocol is defined.* |
+| `v3PrivKey` | (optional) Privacy Key - *Required if v3PrivProtocol is defined.* |
+| `v3AuthProtocol` | (optional) Authentication Protocol - MD5, SHA |
+| `v3PrivProtocol` | (optional) Privacy Protocol - DES, 3DES, AES128, AES192, AES256   |
 
 ### Diagram block
 | Variable | Type | Default Value | Description |

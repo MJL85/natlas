@@ -137,6 +137,11 @@ class natlas_snmp:
         self.ver = 0
         self.v2_community = None
         self._ip = ip
+        self.v3Username = None
+        self.v3AuthKey = None
+        self.v3PrivKey = None
+        self.v3AuthProtocol = None
+        self.v3PrivProtocol = None
 
     #
     # Try to find valid SNMP credentials in the provided list.
@@ -144,41 +149,107 @@ class natlas_snmp:
     #
     def get_cred(self, snmp_creds):
         for cred in snmp_creds:
-            # we don't currently support anything other than SNMPv2
-            if (cred['ver'] != 2):
-                continue
-
-            community = cred['community']
-
             cmdGen = cmdgen.CommandGenerator()
-            errIndication, errStatus, errIndex, varBinds = cmdGen.getCmd(
-                            cmdgen.CommunityData(community),
-                            cmdgen.UdpTransportTarget((self._ip, SNMP_PORT)),
-                            '1.3.6.1.2.1.1.5.0',
-                            lookupNames = False, lookupValues = False
-            )
-            if errIndication:
-                continue
-            else:
-                self.ver = 2
-                self.success = 1
-                self.v2_community = community
+        
+            #SNMPv2
+            if (cred['ver'] == 2):
+                community = cred['community']
 
-                return 1
+                errIndication, errStatus, errIndex, varBinds = cmdGen.getCmd(
+                                cmdgen.CommunityData(community),
+                                cmdgen.UdpTransportTarget((self._ip, SNMP_PORT)),
+                                '1.3.6.1.2.1.1.5.0',
+                                lookupNames = False, lookupValues = False
+                                )
 
-        return 0
+                if errIndication:
+                    continue
+                else:
+                    self.ver = 2
+                    self.success = 1
+                    self.v2_community = community
+                    self.v3Username = None
+                    self.v3AuthKey = None
+                    self.v3PrivKey = None
+                    self.v3AuthProtocol = None
+                    self.v3PrivProtocol = None
+                            
+                    return 1
+            
+            #SNMPv3
+            if (cred['ver'] == 3):
+                community = cred['community']
+                
+                v3Username = cred['v3Username']
+                
+                v3AuthProtocol = cmdgen.usmNoAuthProtocol
+                if 'v3AuthProtocol' in cred:
+                    if cred['v3AuthProtocol'] == 'MD5':
+                        v3AuthProtocol = cmdgen.usmHMACMD5AuthProtocol
+                    if cred['v3AuthProtocol'] == 'SHA':
+                        v3AuthProtocol = cmdgen.usmHMACSHAAuthProtocol
+                    
+                v3PrivProtocol = cmdgen.usmNoPrivProtocol
+                if 'v3PrivProtocol' in cred:
+                    if cred['v3PrivProtocol'] == 'DES':
+                        v3PrivProtocol = cmdgen.usmDESPrivProtocol
+                    if cred['v3PrivProtocol'] == '3DES':
+                        v3PrivProtocol = cmdgen.usm3DESEDEPrivProtocol
+                    if cred['v3PrivProtocol'] == 'AES128':
+                        v3PrivProtocol = cmdgen.usmAesCfb128Protocol
+                    if cred['v3PrivProtocol'] == 'AES192':
+                        v3PrivProtocol = cmdgen.usmAesCfb192Protocol
+                    if cred['v3PrivProtocol'] == 'AES256':
+                        v3PrivProtocol = cmdgen.usmAesCfb256Protocol
+                
+                v3AuthKey = None
+                v3PrivKey = None
+                
+                if (v3AuthProtocol != cmdgen.usmNoAuthProtocol):
+                    v3AuthKey = cred['v3AuthKey']
+                if (v3PrivProtocol != cmdgen.usmNoPrivProtocol):
+                    v3PrivKey = cred['v3PrivKey']
+                    
+                errIndication, errStatus, errIndex, varBinds = cmdGen.getCmd(
+                        cmdgen.UsmUserData(v3Username, v3AuthKey, v3PrivKey, v3AuthProtocol, v3PrivProtocol),
+                        cmdgen.UdpTransportTarget((self._ip, SNMP_PORT)),
+                        '1.3.6.1.2.1.1.5.0',
+                        lookupNames = False, lookupValues = False
+                        )
 
+                if errIndication:
+                    continue
+                else:
+                    self.ver = 3
+                    self.success = 1
+                    self.v2_community = community
+                    self.v3Username = v3Username
+                    self.v3AuthProtocol = v3AuthProtocol
+                    self.v3PrivProtocol = v3PrivProtocol
+                    self.v3AuthKey = v3AuthKey
+                    self.v3PrivKey = v3PrivKey
+
+                    return 1
+            
+            return 0
     #
     # Get single SNMP value at OID.
     #
     def get_val(self, oid):
         cmdGen = cmdgen.CommandGenerator()
-        errIndication, errStatus, errIndex, varBinds = cmdGen.getCmd(
-                        cmdgen.CommunityData(self.v2_community),
+        if self.ver == 2:
+            errIndication, errStatus, errIndex, varBinds = cmdGen.getCmd(
+                            cmdgen.CommunityData(self.v2_community),
+                            cmdgen.UdpTransportTarget((self._ip, SNMP_PORT), retries=2),
+                            oid, lookupNames = False, lookupValues = False
+                            )
+        if self.ver == 3:
+            errIndication, errStatus, errIndex, varBinds = cmdGen.getCmd(
+                        cmdgen.UsmUserData(self.v3Username, self.v3AuthKey, self.v3PrivKey, self.v3AuthProtocol, self.v3PrivProtocol),
                         cmdgen.UdpTransportTarget((self._ip, SNMP_PORT), retries=2),
                         oid, lookupNames = False, lookupValues = False
-        )
-
+                        )
+        
         if errIndication:
             print('[E] get_snmp_val(%s): %s' % (self.v2_community, errIndication))
         else:
@@ -197,14 +268,24 @@ class natlas_snmp:
     #
     def get_bulk(self, oid):
         cmdGen = cmdgen.CommandGenerator()
-        errIndication, errStatus, errIndex, varBindTable = cmdGen.bulkCmd(
-                        cmdgen.CommunityData(self.v2_community),
-                        cmdgen.UdpTransportTarget((self._ip, SNMP_PORT), timeout=30, retries=2),
-                        0, 50,
-                        oid,
-                        lookupNames = False, lookupValues = False
-        )
+        if self.ver == 2:
+            errIndication, errStatus, errIndex, varBindTable = cmdGen.bulkCmd(
+                            cmdgen.CommunityData(self.v2_community),
+                            cmdgen.UdpTransportTarget((self._ip, SNMP_PORT), timeout=30, retries=2),
+                            0, 50,
+                            oid,
+                            lookupNames = False, lookupValues = False
+            )
 
+        if self.ver == 3:
+            errIndication, errStatus, errIndex, varBindTable = cmdGen.bulkCmd(
+                            cmdgen.UsmUserData(self.v3Username, self.v3AuthKey, self.v3PrivKey, self.v3AuthProtocol, self.v3PrivProtocol),
+                            cmdgen.UdpTransportTarget((self._ip, SNMP_PORT), timeout=30, retries=2),
+                            0, 50,
+                            oid,
+                            lookupNames = False, lookupValues = False
+            )
+            
         if errIndication:
             print('[E] get_snmp_bulk(%s): %s' % (self.v2_community, errIndication))
         else:
