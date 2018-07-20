@@ -118,7 +118,7 @@ def mod_entry(natlas_obj, argv):
         return natlas.RETURN_SYNTAXERR
 
     if (opt_node_ip != None):
-        return single_node(natlas_obj, opt_node_ip, opt_router_ip, opt_community, opt_vlan, opt_port, opt_output)
+        return single_node(natlas_obj, opt_node_ip, opt_root_ip, opt_community, opt_vlan, opt_port, opt_output)
         
     return all_nodes(natlas_obj, opt_root_ip, opt_output, opt_depth)
 
