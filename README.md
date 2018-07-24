@@ -293,6 +293,8 @@ Create a new one with
 #### Q3 - I need a diagram with less proprietary information. Can I get one without IPs or serial numbers?
 You can change the text inside each node by editing the config option `diagram\node_text`. Below is an example that would produce a minimal information diagram:
 
+# Install dependencies with pip -r requirements.txt
+
 ```
 "diagram" : {
 	node_text = '<font point-size="10"><b>{node.name}</b></font><br />{node.ios}<br />{node.plat}'
