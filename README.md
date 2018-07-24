@@ -3,6 +3,8 @@
 natlas - Network Atlas  
 Michael Laforest `<mjlaforest` *at* `gmail` *dot* `com>`
 
+##### Requires Python 3.6
+
 Automated discovery and diagram tools using SNMP, CDP, and LLDP.
 
  ```# ./natlas-cli.py diagram -r 10.75.0.1 -o .\network.svg```<br><br><br>*The above command will generate the diagram to the right.* | ![natlas-Diagram Main][diag-main]
