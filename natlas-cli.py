@@ -116,7 +116,7 @@ def load_modules():
     working_dir = os.path.dirname(__file__)
     sys.path.insert(0, './modules')
     ret = []
-    for f in os.listdir(working_dir + '/modules'):
+    for f in os.listdir(working_dir + './modules'):
         if (f[-3:] == '.py'):
             mod = None
             try:
