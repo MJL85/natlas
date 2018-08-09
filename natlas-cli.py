@@ -113,10 +113,9 @@ def print_banner():
     print('Python %s\n' % sys.version.split(' ')[0])
 
 def load_modules():
-    working_dir = os.path.dirname(__file__)
     sys.path.insert(0, './modules')
     ret = []
-    for f in os.listdir(working_dir + '/modules'):
+    for f in os.listdir('./modules'):
         if (f[-3:] == '.py'):
             mod = None
             try:
