@@ -18,19 +18,19 @@ from setuptools import setup
 import os
 
 import imp
-_version = imp.load_source('', 'mnetsuite/_version.py')
+_version = imp.load_source('', 'natlas/_version.py')
 
 long_description = open('README.md').read()
 
 setup(
-        name                    = 'mnet',
+        name                    = 'natlas',
         version                 = _version.__version__,
         author                  = 'Michael Laforest',
         author_email            = 'mjlaforest@gmail.com',
         license                 = 'LICENSE',
-        url                     = 'http://github.com/MJL85/mnet/',
+        url                     = 'http://github.com/MJL85/natlas/',
 
-        description             = 'MNet Suite is a collection of Python tools for network professionals.',
+        description             = 'natlas is a collection of Python tools for network professionals.',
         long_description        = long_description,
         keywords                = 'python network cisco diagram snmp cdp',
 
@@ -43,10 +43,10 @@ setup(
                 'Topic :: Utilities'
         ],
 
-        packages = ['mnetsuite'],
+        packages = ['natlas'],
         include_package_data = True,
 
-        scripts = [ 'mnet.py' ],
+        scripts = [ 'natlas/natlas.py' ],
 
         install_requires = [
             'graphviz',
