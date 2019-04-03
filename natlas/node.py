@@ -475,14 +475,13 @@ class natlas_node:
         for row in self.lldp_vbtbl:
             for name, val in row:
                 name = str(name)
-                if (name.startswith(OID_LLDP_TYPE) == 0):
-                    continue
-
+            	if (name.startswith(OID_LLDP) == 0 ):
+                	continue
                 t = name.split('.')
                 ifidx = t[12]
                 ifidx2 = t[13]
 
-                rip = ''
+                rip = '.'.join(t[16:])
                 for r in self.lldp_vbtbl:
                     for     n, v in r:
                         n = str(n)
