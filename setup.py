@@ -50,7 +50,6 @@ setup(
 
         install_requires = [
             'graphviz',
-            'pysnmp',
             'pydot',
             'pysnmp>=4.2.5',
             'pyparsing',
