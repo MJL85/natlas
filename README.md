@@ -115,7 +115,7 @@ Example
 | `-o <output file>` | The file that the output will be written to.<br />Common file extensions: `.png`, `.pdf`, `.svg` |
 | `-c <config file>` | The JSON configuration file to use. |
 | `-d <max depth>` | The maximum hop depth to discover, starting at the root node specified by `-r` |
-| `-D <output DOT file>` | Output a raw DOT file for manual diagram edits; after editing, use graphviz to rebuild the diagram from a DOT file |
+| `-D <output DOT file>` | Output a raw DOT file for manual diagram edits; after editing, use graphviz to rebuild the diagram from a DOT file.  This option must be used with `-o` |
 | `-t <diagram title>` | The title to give your generated network diagram. |
 | `-C <catalog file>` | If specified, natlas will generate a comma separated (CSV) catalog file with a list of all devices discovered. |
 
