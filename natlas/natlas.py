@@ -121,8 +121,8 @@ class natlas:
         node.query_node()
         return
 
-    def write_diagram(self, output_file, diagram_title): 
-        self.diagram.generate(output_file, diagram_title)
+    def write_diagram(self, output_file, diagram_title, output_raw_dot=None): 
+        self.diagram.generate(output_file, diagram_title, output_raw_dot)
 
     def write_catalog(self, output_file): 
         self.catalog.generate(output_file)

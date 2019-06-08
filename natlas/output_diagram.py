@@ -52,7 +52,7 @@ class natlas_output_diagram:
         self.network = network
         self.config  = network.config
 
-    def generate(self, dot_file, title):
+    def generate(self, dot_file, title, raw_dot_file=None):
         self.network.reset_discovered()
 
         title_text_size = self.config.diagram.title_text_size
@@ -95,6 +95,10 @@ class natlas_output_diagram:
         # add all of the nodes and links
         self.__generate(diagram, self.network.root_node)
 
+#       ## Writing the raw DOT file
+        if raw_dot_file is not None:
+            diagram.write_dot(raw_dot_file)
+            print('Created DOT file: %s' % raw_dot_file)
 
         # expand output string
         files = util.expand_path_pattern(dot_file)

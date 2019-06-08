@@ -41,6 +41,7 @@ def mod_load(mod):
     mod.syntax      = '-r <root IP>\n'                          \
                       '        -o <output file>\n'              \
                       '        [-d <max depth>]\n'              \
+                      '        [-D <output DOT file>]\n'        \
                       '        [-c <config file>]\n'            \
                       '        [-t <diagram title>]\n'          \
                       '        [-C <catalog file>]'
@@ -49,14 +50,15 @@ def mod_load(mod):
     return 1
 
 def mod_entry(natlas_obj, argv):
-    opt_root_ip = None
-    opt_output  = None
-    opt_catalog = None
-    opt_depth   = DEFAULT_OPT_DEPTH
-    opt_title   = DEFAULT_OPT_TITLE
+    opt_root_ip         = None
+    opt_output          = None
+    opt_output_raw_dot  = None
+    opt_catalog         = None
+    opt_depth           = DEFAULT_OPT_DEPTH
+    opt_title           = DEFAULT_OPT_TITLE
 
     try:
-        opts, args = getopt.getopt(argv, 'o:d:r:t:F:c:C:')
+        opts, args = getopt.getopt(argv, 'o:d:r:t:F:c:C:D:')
     except getopt.GetoptError:
         print('Invalid arguments.')
         return
@@ -64,6 +66,7 @@ def mod_entry(natlas_obj, argv):
         if (opt == '-r'):   opt_root_ip = arg
         if (opt == '-o'):   opt_output = arg
         if (opt == '-d'):   opt_depth = int(arg)
+        if (opt == '-D'):   opt_output_raw_dot = arg
         if (opt == '-t'):   opt_title = arg
         if (opt == '-C'):   opt_catalog = arg
 
@@ -73,6 +76,7 @@ def mod_entry(natlas_obj, argv):
 
     print('     Config file: %s' % natlas_obj.config_file)
     print('     Output file: %s' % opt_output)
+    print(' Output DOT file: %s' % opt_output_raw_dot)
     print('Out Catalog file: %s' % opt_catalog)
     print('       Root node: %s' % opt_root_ip)
     print('  Discover depth: %s' % opt_depth)
@@ -85,7 +89,8 @@ def mod_entry(natlas_obj, argv):
     natlas_obj.discover_network(opt_root_ip, 1)
 
     # outputs
-    if (opt_output != None):    natlas_obj.write_diagram(opt_output, opt_title)
+    if (opt_output != None):    natlas_obj.write_diagram(opt_output, opt_title,
+        opt_output_raw_dot)
     if (opt_catalog != None):   natlas_obj.write_catalog(opt_catalog)
 
     return
