@@ -7,7 +7,14 @@ Automated discovery and diagram tools using SNMP, CDP, and LLDP.
 
  ```# ./natlas-cli.py diagram -r 10.75.0.1 -o .\network.svg```<br><br><br>*The above command will generate the diagram to the right.* | ![natlas-Diagram Main][diag-main]
 :--- | --- 
- 
+
+# prerequisits
+
+## Ubuntu 18.04
+
+ ```apt install python3 python3-pysmi python3-pysnmp4 python3-snimpy python3-netaddr python3-pydot ```
+
+
 # Support
 
 If you use any of these tools or find them useful please consider donating.  
