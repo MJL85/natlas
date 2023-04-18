@@ -1,0 +1,9 @@
+graphviz==0.8.4
+netaddr==0.7.19
+ply==3.11
+pyasn1==0.4.3
+pycryptodomex==3.6.4
+pydot==1.2.4
+pyparsing==2.2.0
+pysmi==0.3.1
+pysnmp==4.4.4
