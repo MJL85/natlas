@@ -141,7 +141,8 @@ class natlas_config:
         return '{\n' \
                         '       "snmp" : [\n' \
                         '               { "community":"private", "ver":2 },\n' \
-                        '               { "community":"public", "ver":2 }\n' \
+                        '               { "community":"public", "ver":2 },\n' \
+                        '               { "community":"SNMPv3Example",	"ver":3 , "v3Username":"myUsername", "v3AuthKey":"abc12345678", "v3PrivKey":"12345678abc", "v3AuthProtocol":"SHA", "v3PrivProtocol":"AES128"}\n' \
                         '       ],\n' \
                         '       "domains" : [\n' \
                         '               ".company.net",\n' \
@@ -216,9 +217,33 @@ class natlas_config:
                     print('version is not an int')
                     return 0
                 else:
-                    if (c != 2):
-                        print('version for \'%s\' is not supported' % cred['community'])
+                    #Make sure we're using a supported SNMP version
+                    if (c != 2) and (c != 3):
+                        print('version \'%s\' for \'%s\' is not supported' % (cred['ver'], cred['community']))
                         return 0
+                    if (c == 3):
+                        c = cred['v3Username']
+                        if (type(c) != str):
+                            print('v3Username \'%s\' for \'%s\' must be string.' % (cred['v3Username'], cred['community']))
+                            return 0
+                        if 'v3AuthProtocol' in cred:
+                            c = cred['v3AuthProtocol']
+                            if (c != 'MD5' and c != 'SHA'):
+                               print('v3AuthProtocol for \'%s\' must be MD5 or SHA.' % (cred['community']))
+                               return 0
+                            c = cred['v3AuthKey']
+                            if (type(c) != str):
+                                print('v3AuthKey \'%s\' for \'%s\' must be string.' % (cred['v3AuthKey'], cred['community']))
+                                return 0
+                        if 'v3PrivProtocol' in cred:
+                            c = cred['v3PrivProtocol']
+                            if (c != 'DES' and c != '3DES' and c!= 'AES128' and c!='AES192' and c!='AES256'):
+                                print('v3PrivProtocol for \'%s\' must be DES, 3DES, AES128, AES192 or AES256.' % (cred['community']))
+                                return 0
+                            c = cred['v3PrivKey']
+                            if (type(c) != str):
+                                print('v3PrivKey \'%s\' for \'%s\' must be string.' % (cred['v3PrivKey'], cred['community']))
+                                return 0
             except KeyError as e:
                 print('one or more entries does not include %s' % e)
                 return 0
