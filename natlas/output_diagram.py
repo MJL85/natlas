@@ -101,7 +101,7 @@ class natlas_output_diagram:
         for f in files:
             # get file extension
             file_name, file_ext = os.path.splitext(f)
-            output_func = getattr(diagram, 'write_' + file_ext.lstrip('.'))
+            output_func = getattr(diagram, 'write_' + file_ext.lstrip('.'), None)
             if (output_func == None):
                 print('Error: Output type "%s" does not exist.' % file_ext)
             else:
